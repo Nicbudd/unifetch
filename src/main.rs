@@ -1,5 +1,7 @@
 use std::{fmt, collections::{HashMap, BTreeMap, HashSet}, time::Duration, fs, f32::consts::PI, hash::Hash, cmp::Ordering, path::Display, error::Error};
 
+use clap::Parser;
+
 use chrono::{Local, Utc, NaiveDate, NaiveTime, DateTime, TimeZone, NaiveDateTime, Datelike, LocalResult};
 use chrono::Weekday::*;
 
@@ -1825,35 +1827,48 @@ async fn earthquakes() {
     }
 }
 
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(short, long)]
+    single_line: bool
+
+}
+
 
 #[tokio::main] 
 async fn main() {
 
+    let args = Args::parse();
+
+    if args.single_line == false {
+        
+        head_matter();
+        random_section();
     
-    head_matter();
-    random_section();
+        tokio::join!(
+            solar_lunar(), 
+            current_conditions(),
+            forecast(),
+    
+            // time_and_date();
+    
+            // forecast_analysis();
+            // climatology();
+            // stock_market();
+    
+            // on hold, seavey island API doesn't work
+            //https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=8419870&product=predictions&datum=STND&time_zone=gmt&interval=hilo&units=english&format=json
+            // tides();
+            
+            
+            // teleconnections();
+    
+            earthquakes()
+    
+        );
+    }
 
-    tokio::join!(
-        solar_lunar(), 
-        current_conditions(),
-        forecast(),
 
-        // time_and_date();
-
-        // forecast_analysis();
-        // climatology();
-        // stock_market();
-
-        // on hold, seavey island API doesn't work
-        //https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=8419870&product=predictions&datum=STND&time_zone=gmt&interval=hilo&units=english&format=json
-        // tides();
-        
-        
-        // teleconnections();
-
-        earthquakes()
-
-    );
     
 
 
