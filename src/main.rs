@@ -131,7 +131,7 @@ fn title(s: &str) -> String {
 fn head_matter() {
     // let s: String = "DS2 ".into()
     let utc_now = Utc::now().format("(%H:%MZ)");
-    let local_now = Local::now().format("%a %Y-%b-%d @%I:%M:%S%p");
+    let local_now = Local::now().format("%a %Y-%b-%d @ %I:%M:%S%p");
     let r = rand::random::<u32>();
 
     println!("{}DS2 {} {} - {:08X}", terminal_line('-'), local_now, utc_now, r);
@@ -338,6 +338,10 @@ async fn solar_lunar() {
     println!("{}", s);
 }
 
+fn current_conditions() {
+
+}
+
 
 #[tokio::main] 
 async fn main() {
@@ -345,6 +349,14 @@ async fn main() {
     head_matter();
     random_section();
     solar_lunar().await;
+    // time_and_date();
+
+    current_conditions();
+    // forecast();
+    // forecast_analysis();
+    // stock_market();
+    // tides();
+    // teleconnections();
 
 }
 
