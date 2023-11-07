@@ -1,10 +1,7 @@
 use std::{fmt, collections::HashMap, time::Duration};
 
-use chrono::{DateTime, Local, TimeZone, Utc, NaiveDate, NaiveTime};
-use futures::TryFutureExt;
-use json::JsonValue;
+use chrono::{Local, Utc, NaiveDate, NaiveTime};
 use rand::{self, Rng, thread_rng, rngs::ThreadRng};
-use serde::{self, Serialize, Deserialize};
 
 use serde_json::Value;
 use tokio;
@@ -18,6 +15,7 @@ fn coords_str() -> String {
 
 // GENERAL -----------------------------------------------------------
 
+#[allow(dead_code)]
 enum TermStyle {
     Reset,
     Bold,
@@ -74,8 +72,9 @@ impl fmt::Display for TermStyle {
 
 use TermStyle::*;
 
+// TODO: Maybe not make this a struct? 
 struct Style {
-    styles: Vec<TermStyle>
+    // styles: Vec<TermStyle>
 }
 
 impl Style {
@@ -166,7 +165,7 @@ fn rand_date(rng: &mut ThreadRng) -> NaiveDate {
     let mut day;
     let mut opt_date: Option<NaiveDate> = None;
 
-    while (opt_date.is_none()) {
+    while opt_date.is_none() {
         day = rng.gen_range(0..=366);
         opt_date = NaiveDate::from_yo_opt(year, day)
     }
@@ -354,9 +353,16 @@ async fn main() {
     current_conditions();
     // forecast();
     // forecast_analysis();
+    // climatology();
     // stock_market();
+
+    //https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=8419870&product=predictions&datum=STND&time_zone=gmt&interval=hilo&units=english&format=json
     // tides();
+    
+    
     // teleconnections();
+
+    // earthquakes();
 
 }
 
