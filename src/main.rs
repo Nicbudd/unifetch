@@ -230,7 +230,9 @@ fn random_section() {
 
     s.push_str(&format!("Prob: {:.08} | 10 Digits: {:010} | 6 Letters: {}\n", prob, ten_digit, six_letters.iter().collect::<String>()));
 
-    s.push_str(&format!("Date: {} \x1b[0;47;37m{}{Reset}", rand_date(&mut rng).format("%Y-%m-%d"), rand_date(&mut rng).format("%a")));
+    let date = rand_date(&mut rng);
+
+    s.push_str(&format!("Date: {} \x1b[0;47;37m{}{Reset}", date.format("%Y-%m-%d"), date.format("%a")));
 
     println!("{}", s);
 
