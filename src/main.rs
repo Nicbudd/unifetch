@@ -289,9 +289,10 @@ fn generate_solar_lunar_string(json: serde_json::Value) -> Result<String, String
 
     let closest_time: NaiveTime = NaiveTime::parse_from_str(closest_time, "%H:%M").map_err(|e| e.to_string())?;
 
-    let phase_string = format!("Moon Phase: {} ({}) | {} on {}/{} ({})", moon_phase, fracillum, closest_name, closest_month, closest_day, closest_time.format("%I:%M %p"));
+    let phase_string = format!("Moon Phase: {Bold}{} ({}){Reset} | {Bold}{}{Reset} on {Bold}{}/{} ({}){Reset}", moon_phase, fracillum, closest_name, closest_month, closest_day, closest_time.format("%I:%M %p"));
 
-    Ok(format!("{}{}{}{}",
+    Ok(format!("For {Bold}{}{Reset}\n{}{}{}{}",
+        Local::now().format("%b %d"),
         string_from_rise_set_times("Sun", "Rise", "Set", sunrise, sunset),
         string_from_rise_set_times("Twilight", "Begin", "End", twilight_start, twilight_end),
         string_from_rise_set_times("Moon", "Rise", "Set", moonrise, moonset),   
@@ -421,36 +422,36 @@ async fn current_conditions_wrapper() {
 
 fn indoor_temp_style(temp: f32) -> String {
     if temp.is_nan() {
-        Style::new(&[Red])
+        Style::new(&[Red, Bold])
     } else {
         if temp < 65. {
-            Style::new(&[BlueBg])
+            Style::new(&[BlueBg, Bold])
         } else if temp < 75. {
-            Style::new(&[NoStyle])
+            Style::new(&[NoStyle, Bold])
         } else {
-            Style::new(&[RedBg])
+            Style::new(&[RedBg, Bold])
         }
     }
 }
 
 fn outdoor_temp_style(temp: f32) -> String {
     if temp.is_nan() {
-        Style::new(&[Red])
+        Style::new(&[Red, Bold])
     } else {
         if temp < 10. {
-            Style::new(&[PurpleBg])
+            Style::new(&[PurpleBg, Bold])
         } else if temp < 32. {
-            Style::new(&[BlueBg])
+            Style::new(&[BlueBg, Bold])
         } else if temp < 55. {
-            Style::new(&[GreenBg, Black])
+            Style::new(&[GreenBg, Black, Bold])
         } else if temp < 70. {
-            Style::new(&[YellowBg])
+            Style::new(&[YellowBg, Black, Bold])
         } else if temp < 85. {
-            Style::new(&[RedBg])
+            Style::new(&[RedBg, Bold])
         } else if temp < 95. {
-            Style::new(&[WhiteBg, Red])
+            Style::new(&[WhiteBg, Red, Bold])
         } else {
-            Style::new(&[PurpleBg, Red])
+            Style::new(&[PurpleBg, Red, Bold])
         }
     }
 }
@@ -568,13 +569,13 @@ async fn current_conditions() -> Result<String, String> {
     let apt_temp_change = TempChange::from_db(&local_conditions, true);
 
     let psm_temp = latest_psm.1.temperature_2m.unwrap_or(f32::NAN);
-    let psm_temp_style = outdoor_temp_style(apt_temp);
+    let psm_temp_style = outdoor_temp_style(psm_temp);
     let psm_temp_change = TempChange::from_db(&psm_conditions, true);
 
 
 
     s.push_str(&format!("Apt: {apt_temp_style}{apt_temp:.1}°F{apt_temp_change}{Reset}\n"));
-    s.push_str(&format!("KPSM: {psm_temp_style}{psm_temp:.1}°F{psm_temp_change}{Reset}\n"));
+    s.push_str(&format!("KPSM: {psm_temp_style}{psm_temp:.1}°F{psm_temp_change}{Reset}"));
 
     
     Ok(s)
