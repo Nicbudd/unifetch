@@ -395,8 +395,10 @@ async fn wxer_query(loc: &str, time: &str) -> Result<String, String> {
     let client = reqwest::Client::new();
 
     for addr in addresses {
-        let q = client.get(format!("{addr}/{loc}/{time}.json"))
-                                .timeout(Duration::from_secs(2))
+        let url = format!("{addr}/{loc}/{time}.json");
+        // dbg!(&url);
+        let q = client.get(url)
+                                .timeout(Duration::from_secs(3))
                                 .send()
                                 .await;
 
