@@ -529,12 +529,12 @@ impl TempChange {
 
     fn str(&self) -> &'static str {
         match self {
-            Rising => "↗",
-            Falling => "↘",
-            RapidlyRising => "⬆",
-            RapidlyFalling => "⬇",
-            UnknownChange => "?",
-            Neutral => "➡"
+            Rising => " ↗",
+            Falling => " ↘",
+            RapidlyRising => " ⬆",
+            RapidlyFalling => " ⬇",
+            UnknownChange => "",
+            Neutral => " ➡"
         }
     }
 }
