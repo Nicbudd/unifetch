@@ -1,4 +1,4 @@
-use std::{fmt, collections::{HashMap, BTreeMap}, time::Duration, fs};
+use std::{fmt, collections::{HashMap, BTreeMap}, time::Duration, fs, process::Output};
 
 use chrono::{Local, Utc, NaiveDate, NaiveTime, DateTime};
 use home::home_dir;
@@ -456,7 +456,7 @@ fn outdoor_temp_style(temp: f32) -> String {
     }
 }
 
-enum TempChange {
+enum Trend {
     Rising,
     Falling,
     UnknownChange,
@@ -465,7 +465,7 @@ enum TempChange {
     RapidlyFalling
 }
 
-use TempChange::*;
+use Trend::*;
 
 fn db_reverse_time(db: &BTreeMap<DateTime<Utc>, StationEntry>, duration: chrono::Duration) -> Result<&StationEntry, String> {
     let latest = db.last_key_value()
@@ -478,51 +478,39 @@ fn db_reverse_time(db: &BTreeMap<DateTime<Utc>, StationEntry>, duration: chrono:
     Ok(past_entry)
 }
 
-impl TempChange {
+impl Trend {
 
-    fn from_db_inner(db: &BTreeMap<DateTime<Utc>, StationEntry>, indoor: bool) -> Result<TempChange, ()> {
+    fn from_db_inner<'a, F: FnMut(&'a StationEntry) -> Option<T>, T: std::ops::Sub>(db: &BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F) -> Result<Trend, ()> 
+        where <T as std::ops::Sub<T>>::Output: PartialOrd<f64>
+    {
         let latest = db.last_key_value().ok_or(())?;
 
         let _15_minutes_ago = db_reverse_time(db, chrono::Duration::minutes(15)).map_err(|_| ())?;
         let _1_hour_ago = db_reverse_time(db, chrono::Duration::hours(1)).map_err(|_| ())?;
 
-        if indoor {
-            let hourly_change = _1_hour_ago.indoor_temperature.ok_or(())? - latest.1.indoor_temperature.ok_or(())?;
-            let _15_minute_change = _15_minutes_ago.indoor_temperature.ok_or(())? - latest.1.indoor_temperature.ok_or(())?;
 
-            if hourly_change > 5. && _15_minute_change > 3. {
-                Ok(RapidlyRising)
-            } else if hourly_change > 2. {
-                Ok(Rising)
-            } else if hourly_change < -5. && _15_minute_change < -3. {
-                Ok(RapidlyFalling)
-            } else if hourly_change < -2. {
-                Ok(Falling)
-            } else {
-                Ok(Neutral)
-            }
+        let hourly_change = get_field(_1_hour_ago).ok_or(())? - get_field(latest.1).ok_or(())?;
+        let _15_minute_change = get_field(_15_minutes_ago).ok_or(())? - get_field(latest.1).ok_or(())?;
 
+        if hourly_change > 5. && _15_minute_change > 3. {
+            Ok(RapidlyRising)
+        } else if hourly_change > 2. {
+            Ok(Rising)
+        } else if hourly_change < -5. && _15_minute_change < -3. {
+            Ok(RapidlyFalling)
+        } else if hourly_change < -2. {
+            Ok(Falling)
         } else {
-            let hourly_change = _1_hour_ago.temperature_2m.ok_or(())? - latest.1.temperature_2m.ok_or(())?;
-            let _15_minute_change = _15_minutes_ago.temperature_2m.ok_or(())? - latest.1.temperature_2m.ok_or(())?;
-
-            if hourly_change > 10. && _15_minute_change > 5. {
-                Ok(RapidlyRising)
-            } else if hourly_change > 3. {
-                Ok(Rising)
-            } else if hourly_change < -10. && _15_minute_change < -5. {
-                Ok(RapidlyFalling)
-            } else if hourly_change < -3. {
-                Ok(Falling)
-            } else {
-                Ok(Neutral)
-            }
+            Ok(Neutral)
         }
+
     }
 
-    fn from_db(db: &BTreeMap<DateTime<Utc>, StationEntry>, indoor: bool) -> TempChange {
-        match TempChange::from_db_inner(db, indoor) {
-            Ok(t) => t,
+    fn from_db<'a, F: FnMut(&'a StationEntry) -> Option<T>, T: std::ops::Sub>(db: &BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F) -> Trend 
+        where <T as std::ops::Sub<T>>::Output: PartialOrd<f64>
+        {
+        match Trend::from_db_inner(db, get_field) {
+            Ok(tr) => tr,
             Err(_) => UnknownChange,
         }
     }
@@ -539,7 +527,7 @@ impl TempChange {
     }
 }
 
-impl fmt::Display for TempChange {
+impl fmt::Display for Trend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.str())
     }
@@ -566,11 +554,11 @@ async fn current_conditions() -> Result<String, String> {
 
     let apt_temp = latest_local.1.indoor_temperature.unwrap_or(f32::NAN);
     let apt_temp_style = indoor_temp_style(apt_temp);
-    let apt_temp_change = TempChange::from_db(&local_conditions, true);
+    let apt_temp_change = Trend::from_db(&local_conditions, true);
 
     let psm_temp = latest_psm.1.temperature_2m.unwrap_or(f32::NAN);
     let psm_temp_style = outdoor_temp_style(psm_temp);
-    let psm_temp_change = TempChange::from_db(&psm_conditions, true);
+    let psm_temp_change = Trend::from_db(&psm_conditions, true);
 
 
 
