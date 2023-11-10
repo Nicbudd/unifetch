@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio;
 
+use wxer_lib::*;
+
 // CONFIG ----------------------------------------------------------------------
 
 const COORDS: (f64, f64) = DURHAM_COORDS;
@@ -359,23 +361,23 @@ impl fmt::Debug for CloudLayer {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct StationEntry {
-    indoor_temperature: Option<f32>, // in Fahrenheit
+// #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+// struct StationEntry {
+//     indoor_temperature: Option<f32>, // in Fahrenheit
 
-    temperature_2m: Option<f32>, // in Fahrenheit
-    dewpoint_2m: Option<f32>, // in Fahrenheit
-    sea_level_pressure: Option<f32>, // in hPa
-    wind_10m: Option<(f32, u16)>, // in Knots, Degrees
-    skycover: Vec<CloudLayer>, // in Feet
-    visibility: Option<f32>, // in mile
-    precip_today: Option<f32>,
+//     temperature_2m: Option<f32>, // in Fahrenheit
+//     dewpoint_2m: Option<f32>, // in Fahrenheit
+//     sea_level_pressure: Option<f32>, // in hPa
+//     wind_10m: Option<(f32, u16)>, // in Knots, Degrees
+//     skycover: Vec<CloudLayer>, // in Feet
+//     visibility: Option<f32>, // in mile
+//     precip_today: Option<f32>,
 
-    present_wx: Option<Vec<String>>,
-    raw_metar: Option<String>, 
-    raw_pressure: Option<f32>, // in hPa
+//     present_wx: Option<Vec<String>>,
+//     raw_metar: Option<String>, 
+//     raw_pressure: Option<f32>, // in hPa
 
-}
+// }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct StationEntryWithTime(DateTime<Utc>, StationEntry);
@@ -422,7 +424,9 @@ async fn current_conditions_wrapper() {
     }
 }
 
-fn indoor_temp_style(temp: f32) -> String {
+fn indoor_temp_style(temp: Temperature) -> String {
+    let temp = temp.fahrenheit();
+
     if temp.is_nan() {
         Style::new(&[Red, Bold])
     } else {
@@ -482,7 +486,9 @@ fn db_reverse_time(db: &BTreeMap<DateTime<Utc>, StationEntry>, duration: chrono:
 
 impl Trend {
 
-    fn from_db_inner<'a, F: FnMut(&'a StationEntry) -> &Option<f32>>(db: &'a BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F) -> Result<Trend, ()> {
+    fn from_db_inner<'a, F: FnMut(&'a StationEntry) -> Option<&f32>>
+      (db: &'a BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F, mut get_value: G,
+      thresholds: (f32, f32, f32)) -> Result<Trend, ()> {
         let latest = db.last_key_value().ok_or(())?;
 
         let _15_minutes_ago = db_reverse_time(db, chrono::Duration::minutes(15)).map_err(|_| ())?;
@@ -492,13 +498,13 @@ impl Trend {
         let hourly_change = get_field(_1_hour_ago).ok_or(())? - get_field(latest.1).ok_or(())?;
         let _15_minute_change = get_field(_15_minutes_ago).ok_or(())? - get_field(latest.1).ok_or(())?;
 
-        if hourly_change > 5. && _15_minute_change > 3. {
+        if hourly_change > thresholds.2 && _15_minute_change > thresholds.1 {
             Ok(RapidlyRising)
-        } else if hourly_change > 2. {
+        } else if hourly_change > thresholds.0 {
             Ok(Rising)
-        } else if hourly_change < -5. && _15_minute_change < -3. {
+        } else if hourly_change < -thresholds.2 && _15_minute_change < -thresholds.1 {
             Ok(RapidlyFalling)
-        } else if hourly_change < -2. {
+        } else if hourly_change < -thresholds.0 {
             Ok(Falling)
         } else {
             Ok(Neutral)
@@ -506,11 +512,13 @@ impl Trend {
 
     }
 
-    fn from_db<'a, F: FnMut(&'a StationEntry) -> &Option<f32>>(db: &'a BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F) -> Trend {
-        match Trend::from_db_inner(db, get_field) {
-            Ok(tr) => tr,
-            Err(_) => UnknownChange,
-        }
+    fn from_db<'a, F: FnMut(&'a StationEntry) -> &Option<f32>>
+        (db: &'a BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F, 
+        thresholds: (f32, f32, f32)) -> Trend {
+            match Trend::from_db_inner(db, get_field, thresholds) {
+                Ok(tr) => tr,
+                Err(_) => UnknownChange,
+            }
     }
 
     fn str(&self) -> &'static str {
@@ -550,13 +558,14 @@ async fn current_conditions() -> Result<String, String> {
     let latest_psm = psm_conditions.last_key_value()
                             .ok_or(String::from("PSM json did not have any values"))?;
 
-    let apt_temp = latest_local.1.indoor_temperature.unwrap_or(f32::NAN);
+    let apt_temp = latest_local.1.indoor_temperature.unwrap_or(Temperature::from_fahrenheit(f32::NAN));
     let apt_temp_style = indoor_temp_style(apt_temp);
-    let apt_temp_change = Trend::from_db(&local_conditions, |data| {&data.indoor_temperature});
+    let apt_temp_change = Trend::from_db(&local_conditions, 
+        |data| {&data.indoor_temperature}, (2., 3., 5.,));
 
-    let psm_temp = latest_psm.1.temperature_2m.unwrap_or(f32::NAN);
+    let psm_temp = latest_psm.1.temperature_2m.unwrap_or(Temperature::from_fahrenheit(f32::NAN));
     let psm_temp_style = outdoor_temp_style(psm_temp);
-    let psm_temp_change = Trend::from_db(&psm_conditions, |data| {&data.temperature_2m});
+    let psm_temp_change = Trend::from_db(&psm_conditions, |data| {&data.temperature_2m.fahrenheit()}, (5., 3., 7.,));
 
 
 
