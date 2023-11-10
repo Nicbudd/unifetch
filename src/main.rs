@@ -480,9 +480,7 @@ fn db_reverse_time(db: &BTreeMap<DateTime<Utc>, StationEntry>, duration: chrono:
 
 impl Trend {
 
-    fn from_db_inner<'a, F: FnMut(&'a StationEntry) -> Option<T>, T: std::ops::Sub>(db: &BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F) -> Result<Trend, ()> 
-        where <T as std::ops::Sub<T>>::Output: PartialOrd<f64>
-    {
+    fn from_db_inner<'a, F: FnMut(&'a StationEntry) -> &Option<f32>>(db: &'a BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F) -> Result<Trend, ()> {
         let latest = db.last_key_value().ok_or(())?;
 
         let _15_minutes_ago = db_reverse_time(db, chrono::Duration::minutes(15)).map_err(|_| ())?;
@@ -506,9 +504,7 @@ impl Trend {
 
     }
 
-    fn from_db<'a, F: FnMut(&'a StationEntry) -> Option<T>, T: std::ops::Sub>(db: &BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F) -> Trend 
-        where <T as std::ops::Sub<T>>::Output: PartialOrd<f64>
-        {
+    fn from_db<'a, F: FnMut(&'a StationEntry) -> &Option<f32>>(db: &'a BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F) -> Trend {
         match Trend::from_db_inner(db, get_field) {
             Ok(tr) => tr,
             Err(_) => UnknownChange,
@@ -554,11 +550,11 @@ async fn current_conditions() -> Result<String, String> {
 
     let apt_temp = latest_local.1.indoor_temperature.unwrap_or(f32::NAN);
     let apt_temp_style = indoor_temp_style(apt_temp);
-    let apt_temp_change = Trend::from_db(&local_conditions, true);
+    let apt_temp_change = Trend::from_db(&local_conditions, |data| {&data.indoor_temperature});
 
     let psm_temp = latest_psm.1.temperature_2m.unwrap_or(f32::NAN);
     let psm_temp_style = outdoor_temp_style(psm_temp);
-    let psm_temp_change = Trend::from_db(&psm_conditions, true);
+    let psm_temp_change = Trend::from_db(&psm_conditions, |data| {&data.temperature_2m});
 
 
 
