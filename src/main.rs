@@ -398,7 +398,7 @@ async fn wxer_query(loc: &str, time: &str) -> Result<String, String> {
         let url = format!("{addr}/{loc}/{time}.json");
         // dbg!(&url);
         let q = client.get(url)
-                                .timeout(Duration::from_secs(3))
+                                .timeout(Duration::from_secs(5))
                                 .send()
                                 .await;
 
