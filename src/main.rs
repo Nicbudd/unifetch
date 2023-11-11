@@ -586,7 +586,6 @@ async fn current_conditions() -> Result<String, String> {
 
     let apt_pressure = latest_local.1.sea_level_pressure.unwrap_or(f32::NAN);
     let apt_pressure_style = mslp_style(apt_pressure);
-
     let apt_pres_change = Trend::from_db(&local_conditions, 
         |data| {&data.sea_level_pressure}, 
                 (chrono::Duration::hours(6), 3.),
@@ -595,15 +594,23 @@ async fn current_conditions() -> Result<String, String> {
 
     let psm_temp = latest_psm.1.temperature_2m.unwrap_or(f32::NAN);
     let psm_temp_style = outdoor_temp_style(psm_temp);
-
     let psm_temp_change = Trend::from_db(&psm_conditions, 
         |data| {&data.temperature_2m}, 
                 (chrono::Duration::hours(2), 4.),
                 (chrono::Duration::minutes(15), 2., chrono::Duration::hours(1), 4.));
 
+    let psm_pressure = latest_psm.1.sea_level_pressure.unwrap_or(f32::NAN);
+    let psm_pressure_style = mslp_style(apt_pressure);
+    let psm_pres_change = Trend::from_db(&psm_conditions, 
+        |data| {&data.sea_level_pressure}, 
+                (chrono::Duration::hours(6), 3.),
+                (chrono::Duration::minutes(15), 1., chrono::Duration::hours(3), 2.));
+            
+    // let psm_time: DateTime<Local> = DateTime::from_utc(latest_psm.0);
+    // TODO: UTC to Local
 
-    s.push_str(&format!("Apt: {apt_temp_style}{apt_temp:.1}°F{apt_temp_change}{Reset} {apt_pressure_style}{apt_pressure}{apt_pres_change}{Reset}\n"));
-    s.push_str(&format!("KPSM: {psm_temp_style}{psm_temp:.1}°F{psm_temp_change}{Reset}"));
+    s.push_str(&format!("Apt: ⌛{} {apt_temp_style}{apt_temp:.1}°F{apt_temp_change}{Reset} {apt_pressure_style}{apt_pressure:.1}{apt_pres_change}{Reset}\n", latest_local.0.format("%H:%M")));
+    s.push_str(&format!("KPSM: ⌛{} {psm_temp_style}{psm_temp:.1}°F{psm_temp_change}{Reset} {psm_pressure_style}{psm_pressure:.1}{psm_pres_change}{Reset}", latest_psm.0.format("%H:%M")));
 
     
     Ok(s)
