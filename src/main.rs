@@ -394,11 +394,13 @@ async fn wxer_query(loc: &str, time: &str) -> Result<String, String> {
     
     let client = reqwest::Client::new();
 
+    let mut err_string = String::new();
+
     for addr in addresses {
         let url = format!("{addr}/{loc}/{time}.json");
         // dbg!(&url);
-        let q = client.get(url)
-                                .timeout(Duration::from_secs(3))
+        let q = client.get(&url)
+                                .timeout(Duration::from_secs(5))
                                 .send()
                                 .await;
 
@@ -407,11 +409,16 @@ async fn wxer_query(loc: &str, time: &str) -> Result<String, String> {
 
             if r.status().is_success() {
                 return r.text().await.map_err(|e| e.to_string());
+            } else {
+                err_string.push_str(&format!("{url} - {}, {}\n", r.status().as_u16(), r.status().as_str()))
             }
+        } else {
+            let err = q.unwrap_err();
+            err_string.push_str(&format!("{url} - {:?}, {}\n", err.status(), err.to_string()));
         }
     }
 
-    Err("None of the addresses responded successfully!".into())
+    Err(format!("None of the addresses responded successfully!\n{err_string}"))
 }
 
 
