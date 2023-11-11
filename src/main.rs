@@ -451,6 +451,20 @@ fn outdoor_temp_style(temp: f32) -> String {
     }
 }
 
+fn mslp_style(pres: f32) -> String {
+    if pres.is_nan() {
+        Style::new(&[Red, Bold])
+    } else {
+        if pres < 1005. {
+            Style::new(&[RedBg, Black, Bold])
+        } else if pres > 1030. {
+            Style::new(&[BlueBg, Black, Bold])
+        } else {
+            Style::new(&[WhiteBg, Black, Bold])
+        }
+    }
+}
+
 enum Trend {
     Rising,
     Falling,
@@ -476,23 +490,38 @@ fn db_reverse_time(db: &BTreeMap<DateTime<Utc>, StationEntry>, duration: chrono:
 impl Trend {
 
     fn from_db_inner<'a, F: FnMut(&'a StationEntry) -> &Option<f32>>
-      (db: &'a BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F, thresholds: (f32, f32, f32)) -> Result<Trend, ()> {
+      (db: &'a BTreeMap<DateTime<Utc>, StationEntry>, 
+      mut get_field: F, 
+      change_criteria: (chrono::Duration, f32), 
+      rapid_criteria: (chrono::Duration, f32, chrono::Duration, f32)) -> Result<Trend, ()> {
+        
         let latest = db.last_key_value().ok_or(())?;
 
-        let _15_minutes_ago = db_reverse_time(db, chrono::Duration::minutes(15)).map_err(|_| ())?;
-        let _1_hour_ago = db_reverse_time(db, chrono::Duration::hours(1)).map_err(|_| ())?;
+        let ref_1 = db_reverse_time(db, change_criteria.0).map_err(|_| ())?;
+        let ref_2 = db_reverse_time(db, rapid_criteria.0).map_err(|_| ())?;
+        let ref_3 = db_reverse_time(db, rapid_criteria.2).map_err(|_| ())?;
 
 
-        let hourly_change = get_field(_1_hour_ago).ok_or(())? - get_field(latest.1).ok_or(())?;
-        let _15_minute_change = get_field(_15_minutes_ago).ok_or(())? - get_field(latest.1).ok_or(())?;
+        let ref_1_change = get_field(latest.1).ok_or(())? - get_field(ref_1).ok_or(())?;
+        let ref_2_change = get_field(latest.1).ok_or(())? - get_field(ref_2).ok_or(())?;
+        let ref_3_change = get_field(latest.1).ok_or(())? - get_field(ref_3).ok_or(())?;
 
-        if hourly_change > thresholds.2 && _15_minute_change > thresholds.1 {
+        // dbg!(ref_1);
+        // dbg!(ref_2);
+        // dbg!(ref_3);
+
+        // dbg!(ref_1_change);
+        // dbg!(ref_2_change);
+        // dbg!(ref_3_change);
+
+
+        if ref_2_change > rapid_criteria.1 && ref_3_change > rapid_criteria.3 {
             Ok(RapidlyRising)
-        } else if hourly_change > thresholds.0 {
+        } else if ref_1_change > change_criteria.1 {
             Ok(Rising)
-        } else if hourly_change < -thresholds.2 && _15_minute_change < -thresholds.1 {
+        } else if ref_2_change < -rapid_criteria.1 && ref_3_change < -rapid_criteria.3 {
             Ok(RapidlyFalling)
-        } else if hourly_change < -thresholds.0 {
+        } else if ref_1_change < -change_criteria.1 {
             Ok(Falling)
         } else {
             Ok(Neutral)
@@ -502,8 +531,10 @@ impl Trend {
 
     fn from_db<'a, F: FnMut(&'a StationEntry) -> &Option<f32>>
         (db: &'a BTreeMap<DateTime<Utc>, StationEntry>, get_field: F, 
-        thresholds: (f32, f32, f32)) -> Trend {
-            match Trend::from_db_inner(db, get_field, thresholds) {
+        change_criteria: (chrono::Duration, f32), 
+        rapid_criteria: (chrono::Duration, f32, chrono::Duration, f32)) -> Trend {
+
+            match Trend::from_db_inner(db, get_field, change_criteria, rapid_criteria) {
                 Ok(tr) => tr,
                 Err(_) => UnknownChange,
             }
@@ -549,15 +580,29 @@ async fn current_conditions() -> Result<String, String> {
     let apt_temp = latest_local.1.indoor_temperature.unwrap_or(f32::NAN);
     let apt_temp_style = indoor_temp_style(apt_temp);
     let apt_temp_change = Trend::from_db(&local_conditions, 
-        |data| {&data.indoor_temperature}, (2., 3., 5.,));
+        |data| {&data.indoor_temperature}, 
+                (chrono::Duration::hours(2), 2.),
+                (chrono::Duration::minutes(15), 2., chrono::Duration::hours(1), 2.));
+
+    let apt_pressure = latest_local.1.sea_level_pressure.unwrap_or(f32::NAN);
+    let apt_pressure_style = mslp_style(apt_pressure);
+
+    let apt_pres_change = Trend::from_db(&local_conditions, 
+        |data| {&data.sea_level_pressure}, 
+                (chrono::Duration::hours(6), 3.),
+                (chrono::Duration::minutes(15), 1., chrono::Duration::hours(3), 2.));
+
 
     let psm_temp = latest_psm.1.temperature_2m.unwrap_or(f32::NAN);
     let psm_temp_style = outdoor_temp_style(psm_temp);
-    let psm_temp_change = Trend::from_db(&psm_conditions, |data| {&data.temperature_2m}, (5., 3., 7.,));
+
+    let psm_temp_change = Trend::from_db(&psm_conditions, 
+        |data| {&data.temperature_2m}, 
+                (chrono::Duration::hours(2), 4.),
+                (chrono::Duration::minutes(15), 2., chrono::Duration::hours(1), 4.));
 
 
-
-    s.push_str(&format!("Apt: {apt_temp_style}{apt_temp:.1}°F{apt_temp_change}{Reset}\n"));
+    s.push_str(&format!("Apt: {apt_temp_style}{apt_temp:.1}°F{apt_temp_change}{Reset} {apt_pressure_style}{apt_pressure}{apt_pres_change}{Reset}\n"));
     s.push_str(&format!("KPSM: {psm_temp_style}{psm_temp:.1}°F{psm_temp_change}{Reset}"));
 
     
