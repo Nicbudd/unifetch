@@ -1328,7 +1328,7 @@ dependencies = [
 
 [[package]]
 name = "unifetch"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -1573,6 +1573,7 @@ dependencies = [
 [[package]]
 name = "wxer_lib"
 version = "0.2.0"
+source = "git+https://github.com/Nicbudd/wxer_lib#4b2b38de581b21771b2b945ef14d4366c82adbd0"
 dependencies = [
  "anyhow",
  "chrono",
