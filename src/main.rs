@@ -1,4 +1,4 @@
-use std::{fmt, collections::{HashMap, BTreeMap}, time::Duration, fs, process::Output};
+use std::{fmt, collections::{HashMap, BTreeMap}, time::Duration, fs};
 
 use chrono::{Local, Utc, NaiveDate, NaiveTime, DateTime};
 use home::home_dir;
@@ -361,23 +361,6 @@ impl fmt::Debug for CloudLayer {
     }
 }
 
-// #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-// struct StationEntry {
-//     indoor_temperature: Option<f32>, // in Fahrenheit
-
-//     temperature_2m: Option<f32>, // in Fahrenheit
-//     dewpoint_2m: Option<f32>, // in Fahrenheit
-//     sea_level_pressure: Option<f32>, // in hPa
-//     wind_10m: Option<(f32, u16)>, // in Knots, Degrees
-//     skycover: Vec<CloudLayer>, // in Feet
-//     visibility: Option<f32>, // in mile
-//     precip_today: Option<f32>,
-
-//     present_wx: Option<Vec<String>>,
-//     raw_metar: Option<String>, 
-//     raw_pressure: Option<f32>, // in hPa
-
-// }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct StationEntryWithTime(DateTime<Utc>, StationEntry);
@@ -511,7 +494,7 @@ impl Trend {
     }
 
     fn from_db<'a, F: FnMut(&'a StationEntry) -> &Option<f32>>
-        (db: &'a BTreeMap<DateTime<Utc>, StationEntry>, mut get_field: F, 
+        (db: &'a BTreeMap<DateTime<Utc>, StationEntry>, get_field: F, 
         thresholds: (f32, f32, f32)) -> Trend {
             match Trend::from_db_inner(db, get_field, thresholds) {
                 Ok(tr) => tr,
