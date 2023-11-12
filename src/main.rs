@@ -22,6 +22,7 @@ fn coords_str() -> String {
 
 // GENERAL ---------------------------------------------------------------------
 
+#[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
 enum TermStyle {
     Reset,
@@ -113,6 +114,10 @@ impl Style {
         }
 
         format!("\x1b[{}m", nums.join(";"))
+    }
+
+    fn error() -> String {
+        Style::new(&[Red, Bold])
     }
 }
 
@@ -385,7 +390,7 @@ async fn wxer_query(loc: &str, time: &str) -> Result<String, String> {
         let url = format!("{addr}/{loc}/{time}.json");
         // dbg!(&url);
         let q = client.get(&url)
-                                .timeout(Duration::from_secs(5))
+                                .timeout(Duration::from_secs(10))
                                 .send()
                                 .await;
 
@@ -457,7 +462,7 @@ fn mslp_style(pres: f32) -> String {
     } else {
         if pres < 1005. {
             Style::new(&[RedBg, Black, Bold])
-        } else if pres > 1030. {
+        } else if pres > 1025. {
             Style::new(&[BlueBg, Black, Bold])
         } else {
             Style::new(&[WhiteBg, Black, Bold])
@@ -546,7 +551,7 @@ impl Trend {
             Falling => " ↘",
             RapidlyRising => " ⬆",
             RapidlyFalling => " ⬇",
-            UnknownChange => "",
+            UnknownChange => " ?",
             Neutral => " ➡"
         }
     }
@@ -557,6 +562,134 @@ impl fmt::Display for Trend {
         write!(f, "{}", self.str())
     }
 }
+
+#[derive(Debug, PartialEq)]
+enum WxCategory {
+    Snow,
+    Rain,
+    Severe,
+    Fire,
+    Fog,
+    None
+}
+
+fn format_wx(o: Option<Vec<String>>) -> String {
+    let mut text: String;
+    let mut style: String;
+
+    match o {
+        None => {
+            text = String::from("N/A");
+            style = Style::new(&[Red, Bold]);
+        },
+        Some(v) => {
+            let mut wx_types = vec![];
+
+            for wx in &v {
+
+                let c = if wx.contains("FU") | wx.contains("VA") {
+                    WxCategory::Fire
+                } else if wx.contains("GR") | wx.contains("TS") | wx.contains("DU") | wx.contains("SA") | wx.contains("SQ") | wx.contains("DS") | wx.contains("SS") | wx.contains("FC") {
+                    WxCategory::Severe
+                } else if wx.contains("SN") | wx.contains("SG") | wx.contains("GS") | wx.contains("PL") | wx.contains("IC") {
+                    WxCategory::Snow
+                } else if wx.contains("DZ") | wx.contains("RA") | wx.contains("UP") {
+                    WxCategory::Rain
+                } else if wx.contains("FG") | wx.contains("BR") | wx.contains("HZ") | wx.contains("PY") {
+                    WxCategory::Fog
+                } else {
+                    WxCategory::None
+                };
+
+                wx_types.push(c);
+            }
+
+            if wx_types.contains(&WxCategory::Fire) {
+                style = Style::new(&[RedBg, White, Bold]);
+            } else if wx_types.contains(&WxCategory::Severe) {
+                style = Style::new(&[YellowBg, Black, Bold]);
+            } else if wx_types.contains(&WxCategory::Snow) {
+                style = Style::new(&[WhiteBg, Blue, Bold]);
+            } else if wx_types.contains(&WxCategory::Rain) {
+                style = Style::new(&[BlueBg, Black, Bold]);
+            } else if wx_types.contains(&WxCategory::Fog) {
+                style = Style::new(&[WhiteBg, Black, Bold]);
+            } else {
+                style = Style::new(&[Reset]);
+            }
+            
+            text = v.join(" ");
+        }
+    }
+
+    if text.len() == 0 {
+        text.push_str("No WX");
+        style = Style::new(&[Bold])
+    }
+
+    format!("{style}{text}{Reset}")
+
+
+}
+
+
+fn format_dewpoint(s: &StationEntry) -> String {
+    let dew_text: String;
+    let dew_style: String;
+
+    match s.dewpoint_2m {
+        Some(a) => {
+
+            dew_style = if a > 70. {
+                Style::new(&[PurpleBg, Black, Bold])
+            } else if a > 60. {
+                Style::new(&[BlueBg, Black, Bold])
+            } else if a > 45. {
+                Style::new(&[GreenBg, Black, Bold])
+            } else if a < 30. {
+                Style::new(&[YellowBg, Black, Bold])
+            } else {
+                Style::new(&[Bold])
+            };
+
+            dew_text = format!("{a:3.0}°F");
+        }
+        None => {
+            dew_text = String::from("  N/A   ");
+            dew_style = Style::error();
+        }
+    }
+
+    let rh_text: String;
+    let rh_style: String;
+    let rh = s.relative_humidity_2m();
+
+    match rh {
+        Some(a) => {
+
+            rh_style = if a > 95. {
+                Style::new(&[PurpleBg, Black, Bold])
+            } else if a > 90. {
+                Style::new(&[BlueBg, Black, Bold])
+            } else if a > 60. {
+                Style::new(&[GreenBg, Black, Bold])
+            } else if a > 40. {
+                Style::new(&[Bold])
+            } else {
+                Style::new(&[YellowBg, Black, Bold])
+            };
+
+            rh_text = format!("{a:4.1}%");
+
+        }
+        None => {
+            rh_text = String::from("N/A");
+            rh_style = Style::error();
+        }
+    }
+
+    format!("{dew_style}{dew_text}{Reset} ({rh_style}{rh_text}{Reset})")
+} 
 
 async fn current_conditions() -> Result<String, String> {
 
@@ -572,11 +705,13 @@ async fn current_conditions() -> Result<String, String> {
     let mut s = title("CURRENT CONDITIONS");
 
     let latest_local = local_conditions.last_key_value()
-                            .ok_or(String::from("Local json did not have any values"))?;
-    
-    let latest_psm = psm_conditions.last_key_value()
-                            .ok_or(String::from("PSM json did not have any values"))?;
+        .ok_or(String::from("Local json did not have any values"))?;
 
+    let latest_psm = psm_conditions.last_key_value()
+        .ok_or(String::from("PSM json did not have any values"))?;
+
+
+    let apt_time: DateTime<Local> = DateTime::from(latest_local.0.clone());
     let apt_temp = latest_local.1.indoor_temperature.unwrap_or(f32::NAN);
     let apt_temp_style = indoor_temp_style(apt_temp);
     let apt_temp_change = Trend::from_db(&local_conditions, 
@@ -591,7 +726,7 @@ async fn current_conditions() -> Result<String, String> {
                 (chrono::Duration::hours(6), 3.),
                 (chrono::Duration::minutes(15), 1., chrono::Duration::hours(3), 2.));
 
-
+    let psm_time: DateTime<Local> = DateTime::from(latest_psm.0.clone());
     let psm_temp = latest_psm.1.temperature_2m.unwrap_or(f32::NAN);
     let psm_temp_style = outdoor_temp_style(psm_temp);
     let psm_temp_change = Trend::from_db(&psm_conditions, 
@@ -605,13 +740,17 @@ async fn current_conditions() -> Result<String, String> {
         |data| {&data.sea_level_pressure}, 
                 (chrono::Duration::hours(6), 3.),
                 (chrono::Duration::minutes(15), 1., chrono::Duration::hours(3), 2.));
+
+    let psm_wx = format_wx(latest_psm.1.present_wx.clone());
+
+    let psm_dew = format_dewpoint(latest_psm.1);
             
     // let psm_time: DateTime<Local> = DateTime::from_utc(latest_psm.0);
     // TODO: UTC to Local
 
-    s.push_str(&format!("Apt: ⌛{} {apt_temp_style}{apt_temp:.1}°F{apt_temp_change}{Reset} {apt_pressure_style}{apt_pressure:.1}{apt_pres_change}{Reset}\n", latest_local.0.format("%H:%M")));
-    s.push_str(&format!("KPSM: ⌛{} {psm_temp_style}{psm_temp:.1}°F{psm_temp_change}{Reset} {psm_pressure_style}{psm_pressure:.1}{psm_pres_change}{Reset}", latest_psm.0.format("%H:%M")));
-
+    s.push_str(&format!("Apt:  ⌛{} Temp: {apt_temp_style}{apt_temp:.0}°F{apt_temp_change}{Reset} {apt_pressure_style}{apt_pressure:.1}{apt_pres_change}{Reset}\n", apt_time.format("%I:%M %p")));
+    s.push_str(&format!("KPSM: ⌛{} Temp: {psm_temp_style}{psm_temp:.0}°F{psm_temp_change}{Reset} {psm_pressure_style}{psm_pressure:.1}{psm_pres_change}{Reset}", psm_time.format("%I:%M %p")));
+    s.push_str(&format!(" {psm_wx} Dew:{psm_dew}"));
     
     Ok(s)
 
