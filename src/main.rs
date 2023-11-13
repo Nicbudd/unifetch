@@ -693,8 +693,8 @@ fn format_dewpoint(s: &StationEntry) -> String {
 
 async fn current_conditions() -> Result<String, String> {
 
-    let local_conditions = wxer_query("local", "all").await?;
-    let psm_conditions = wxer_query("psm", "all").await?;
+    let local_conditions = wxer_query("local", "six_hours").await?;
+    let psm_conditions = wxer_query("psm", "six_hours").await?;
 
     // dbg!(&local_conditions);
     // dbg!(&psm_conditions);
@@ -741,6 +741,9 @@ async fn current_conditions() -> Result<String, String> {
                 (chrono::Duration::hours(6), 3.),
                 (chrono::Duration::minutes(15), 1., chrono::Duration::hours(3), 2.));
 
+    let apt_psm_pres_diff = psm_pressure - apt_pressure;
+
+
     let psm_wx = format_wx(latest_psm.1.present_wx.clone());
 
     let psm_dew = format_dewpoint(latest_psm.1);
@@ -748,7 +751,7 @@ async fn current_conditions() -> Result<String, String> {
     // let psm_time: DateTime<Local> = DateTime::from_utc(latest_psm.0);
     // TODO: UTC to Local
 
-    s.push_str(&format!("Apt:  ⌛{} Temp: {apt_temp_style}{apt_temp:.0}°F{apt_temp_change}{Reset} {apt_pressure_style}{apt_pressure:.1}{apt_pres_change}{Reset}\n", apt_time.format("%I:%M %p")));
+    s.push_str(&format!("Apt:  ⌛{} Temp: {apt_temp_style}{apt_temp:.0}°F{apt_temp_change}{Reset} {apt_pressure_style}{apt_pressure:.1}{apt_pres_change}{Reset} {Bold}{apt_psm_pres_diff:.2} mbar{Reset}\n", apt_time.format("%I:%M %p")));
     s.push_str(&format!("KPSM: ⌛{} Temp: {psm_temp_style}{psm_temp:.0}°F{psm_temp_change}{Reset} {psm_pressure_style}{psm_pressure:.1}{psm_pres_change}{Reset}", psm_time.format("%I:%M %p")));
     s.push_str(&format!(" {psm_wx} Dew:{psm_dew}"));
     
