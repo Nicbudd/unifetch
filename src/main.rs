@@ -761,7 +761,9 @@ async fn current_conditions() -> Result<String, String> {
         let same_time_local = local_conditions.get(&metar_msmts.0);
 
         if let Some(t) = same_time_local {
-            s.push_str(&format!("{}: {:.2}mb, ", metar_msmts.0.format("%d %H:%MZ"), metar_msmts.1.sea_level_pressure.unwrap_or(f32::NAN) - t.sea_level_pressure.unwrap_or(f32::NAN)));
+            let diff = metar_msmts.1.sea_level_pressure.unwrap_or(f32::NAN) - t.sea_level_pressure.unwrap_or(f32::NAN);
+            s.push_str(&format!("{}: {Bold}{:.2}{Reset}mb, \n", metar_msmts.0.format("%d %H:%MZ"), diff));
+            // s.push_str(&format!("{:.2}\n", diff))
         }
         
     }
