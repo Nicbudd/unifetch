@@ -465,7 +465,7 @@ fn mslp_style(pres: f32) -> String {
         } else if pres > 1025. {
             Style::new(&[BlueBg, Black, Bold])
         } else {
-            Style::new(&[WhiteBg, Black, Bold])
+            Style::new(&[Bold])
         }
     }
 }
@@ -671,7 +671,7 @@ fn format_dewpoint(s: &StationEntry) -> String {
                 Style::new(&[PurpleBg, Black, Bold])
             } else if a > 90. {
                 Style::new(&[BlueBg, Black, Bold])
-            } else if a > 60. {
+            } else if a > 70. {
                 Style::new(&[GreenBg, Black, Bold])
             } else if a > 40. {
                 Style::new(&[Bold])
@@ -690,6 +690,95 @@ fn format_dewpoint(s: &StationEntry) -> String {
 
     format!("{dew_style}{dew_text}{Reset} ({rh_style}{rh_text}{Reset})")
 } 
+
+fn format_wind(s: &StationEntry) -> String {
+    let text: String;
+    let style: String;
+
+    match s.wind_10m {
+        Some(a) => {
+
+            style = if a.speed > 45. {
+                Style::new(&[YellowBg, Black, Bold])
+            } else if a.speed > 32. {
+                Style::new(&[RedBg, Black, Bold])
+            } else if a.speed > 20. {
+                Style::new(&[PurpleBg, Black, Bold])
+            } else if a.speed > 12. {
+                Style::new(&[BlueBg, Black, Bold])
+            } else {
+                Style::new(&[Bold])
+            };
+
+            text = format!("{:03}({:3})@{:2}kts", a.direction.degrees(), a.direction.cardinal(), a.speed);
+        }
+        None => {
+            text = String::from("    N/A   ");
+            style = Style::error();
+        }
+    }
+
+    format!("{style}{text}{Reset}")
+}
+
+fn format_cloud(s: &StationEntry) -> String {
+    let text: String;
+    let style: String;
+
+    match &s.skycover {
+        None => {text = "N/A".into(); style = Style::new(&[Red, Bold]);},
+        Some(s) => {
+            match s {
+                SkyCoverage::Clear => {text = "CLR".into(); style = Style::new(&[Bold]);}
+                SkyCoverage::Cloudy(v) => {
+                    text = v.iter()
+                            .map(|x| x.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                    
+                    let all_covers = v.iter()
+                                        .map(|x| x.coverage)
+                                        .collect::<Vec<_>>();
+
+                    style = if all_covers.contains(&CloudLayerCoverage::Overcast) {
+                        Style::new(&[WhiteBg, Black, Bold])
+                    } else {
+                        Style::new(&[Bold])
+                    }
+                    
+                }
+            }
+        }
+    }
+
+    format!("{style}{text}{Reset}")
+}
+
+fn format_visibility(e: &StationEntry) -> String {
+    let text: String;
+    let style: String;
+
+    match e.visibility {
+        None => {text = "N/A".into(); style = Style::new(&[Red, Bold]);},
+        Some(v) => {
+            if v <= 1. {
+                style = Style::new(&[WhiteBg, Black, Bold]);
+                text = format!("{v:.2}mi");
+
+            } else if v < 3. {
+                style = Style::new(&[WhiteBg, Black, Bold]);
+                text = format!("{v:.1}mi");
+
+            } else {
+                style = Style::new(&[Bold]);
+                text = format!("{v:.0}mi");
+            }
+        }
+    }
+
+    format!("{style}{text}{Reset}")
+
+}
 
 async fn current_conditions() -> Result<String, String> {
 
@@ -741,12 +830,16 @@ async fn current_conditions() -> Result<String, String> {
                 (chrono::Duration::hours(6), 3.),
                 (chrono::Duration::minutes(15), 1., chrono::Duration::hours(3), 2.));
 
+    let psm_wx = format_wx(latest_psm.1.present_wx.clone());
+    let psm_dew = format_dewpoint(latest_psm.1);
+    let psm_wind = format_wind(latest_psm.1);
+
+    let psm_cloud = format_cloud(latest_psm.1);
+    let psm_metar = format!("{Bold}{}{Reset}", latest_psm.1.raw_metar.clone().unwrap_or("N/A".into()));
+    let psm_visibility = format_visibility(latest_psm.1);
+
     let apt_psm_pres_diff = psm_pressure - apt_pressure;
 
-
-    let psm_wx = format_wx(latest_psm.1.present_wx.clone());
-
-    let psm_dew = format_dewpoint(latest_psm.1);
             
     // let psm_time: DateTime<Local> = DateTime::from_utc(latest_psm.0);
     // TODO: UTC to Local
@@ -754,19 +847,26 @@ async fn current_conditions() -> Result<String, String> {
 
     s.push_str(&format!("Apt:  ⌛{} Temp: {apt_temp_style}{apt_temp:.0}°F{apt_temp_change}{Reset} {apt_pressure_style}{apt_pressure:.1}{apt_pres_change}{Reset} {Bold}{apt_psm_pres_diff:.2} mbar{Reset}\n", apt_time.format("%I:%M %p")));
     s.push_str(&format!("KPSM: ⌛{} Temp: {psm_temp_style}{psm_temp:.0}°F{psm_temp_change}{Reset} {psm_pressure_style}{psm_pressure:.1}{psm_pres_change}{Reset}", psm_time.format("%I:%M %p")));
-    s.push_str(&format!(" {psm_wx} Dew:{psm_dew}\n"));
-    s.push_str(&format!("Pressure diffs: "));
-    
+    s.push_str(&format!(" {psm_wx} Dew:{psm_dew}\n\tWind: {psm_wind} Clouds: {psm_cloud} Vis: {psm_visibility}\nMETAR: {psm_metar}\n"));
+    s.push_str(&format!("\nPressure diffs: "));
+        
+    let mut diffs = vec![];
+
     for metar_msmts in psm_conditions {
         let same_time_local = local_conditions.get(&metar_msmts.0);
 
         if let Some(t) = same_time_local {
             let diff = metar_msmts.1.sea_level_pressure.unwrap_or(f32::NAN) - t.sea_level_pressure.unwrap_or(f32::NAN);
-            s.push_str(&format!("{}: {Bold}{:.2}{Reset}mb, \n", metar_msmts.0.format("%d %H:%MZ"), diff));
+            s.push_str(&format!("{}: {Bold}{:.2}{Reset}mb, ", metar_msmts.0.format("%d %H:%MZ"), diff));
             // s.push_str(&format!("{:.2}\n", diff))
+            diffs.push(diff);
         }
         
     }
+
+    diffs.remove(0);
+
+    s.push_str(&format!("Avg: {Bold}{:.3}{Reset}mb", diffs.iter().sum::<f32>() / diffs.len() as f32));
 
 
     Ok(s)   
