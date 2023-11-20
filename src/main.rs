@@ -494,7 +494,7 @@ fn db_reverse_time(db: &BTreeMap<DateTime<Utc>, StationEntry>, duration: chrono:
 
 impl Trend {
 
-    fn from_db_inner<'a, F: FnMut(&'a StationEntry) -> &Option<f32>>
+    fn from_db_inner<'a, F: FnMut(&'a StationEntry) -> Option<f32>>
       (db: &'a BTreeMap<DateTime<Utc>, StationEntry>, 
       mut get_field: F, 
       change_criteria: (chrono::Duration, f32), 
@@ -534,7 +534,7 @@ impl Trend {
 
     }
 
-    fn from_db<'a, F: FnMut(&'a StationEntry) -> &Option<f32>>
+    fn from_db<'a, F: FnMut(&'a StationEntry) -> Option<f32>>
         (db: &'a BTreeMap<DateTime<Utc>, StationEntry>, get_field: F, 
         change_criteria: (chrono::Duration, f32), 
         rapid_criteria: (chrono::Duration, f32, chrono::Duration, f32)) -> Trend {
@@ -652,7 +652,7 @@ fn format_dewpoint(s: &StationEntry) -> String {
                 Style::new(&[Bold])
             };
 
-            dew_text = format!("{a:3.0}°F");
+            dew_text = format!("{a:.0}°F");
         }
         None => {
             dew_text = String::from("  N/A   ");
@@ -710,7 +710,7 @@ fn format_wind(s: &StationEntry) -> String {
                 Style::new(&[Bold])
             };
 
-            text = format!("{:03}({:3})@{:2}kts", a.direction.degrees(), a.direction.cardinal(), a.speed);
+            text = format!("{:03}({})@{:2}kts", a.direction.degrees(), a.direction.cardinal(), a.speed);
         }
         None => {
             text = String::from("    N/A   ");
@@ -780,94 +780,115 @@ fn format_visibility(e: &StationEntry) -> String {
 
 }
 
+fn format_column_width(s: String) -> String {
+    s.chars()
+    .enumerate()
+    .fold(String::new(),|mut a, (i, x)| {
+        if i % 76 == 0 {
+            a.push_str("    ");
+            a.push(x);
+        } else if i % 76 == 75 {
+            a.push(x);
+            a.push('\n');
+        } else {
+            a.push(x);
+        }
+
+        a
+    })
+}
+
+fn format_metar(e: &StationEntry) -> String {
+    let mut s = e.raw_metar.clone().unwrap_or("N/A".into());
+    s = format!("METAR: {s}");
+    s = format_column_width(s);
+    format!("{Bold}{s}{Reset}")
+}
+
+fn station_line(dt: &DateTime<Utc>, e: &StationEntry, station: &Station,
+  db: &BTreeMap<DateTime<Utc>, StationEntry>) -> Result<String, String> {
+    let mut s = String::new();
+
+    let time: DateTime<Local> = DateTime::from(dt.clone());
+    let temp = e.temperature_2m.unwrap_or(f32::NAN);
+    let temp_style = outdoor_temp_style(temp);
+    let temp_change = Trend::from_db(&db, 
+        |data| {data.temperature_2m}, 
+                (chrono::Duration::hours(2), 4.),
+                (chrono::Duration::minutes(15), 2., chrono::Duration::hours(1), 4.));
+
+    let pressure = e.slp(&station).unwrap_or(f32::NAN);
+    let pressure_style = mslp_style(pressure);
+    let pres_change = Trend::from_db(&db, 
+        |data| {data.slp(&station)}, 
+                (chrono::Duration::hours(6), 3.),
+                (chrono::Duration::minutes(15), 1., chrono::Duration::hours(3), 2.));
+
+    let wx = format_wx(e.present_wx.clone());
+    let dew = format_dewpoint(e);
+    let wind = format_wind(e);
+
+    let cloud = format_cloud(e);
+    let metar = format_metar(e);
+    let visibility = format_visibility(e);
+
+    s.push_str(&format!("{}: ⌛{} Temp: {temp_style}{temp:.0}°F{temp_change}{Reset} {pressure_style}{pressure:.1}{pres_change}{Reset}", station.name, time.format("%I:%M %p")));
+    s.push_str(&format!(" {wx} Dew:{dew}\n    Wind: {wind} Vis: {visibility}\n{metar}\nClouds: {cloud}\n"));
+        
+    Ok(s)
+}
+
 async fn current_conditions() -> Result<String, String> {
 
-    let local_conditions = wxer_query("local", "all").await?;
-    let psm_conditions = wxer_query("psm", "all").await?;
+    let local_station = Station {
+        coords: (43.00, 0.0), // im not giving that away
+        altitude: 24.,
+        name: String::from("APT"),
+    };
+
+    let psm_station = Station {
+        coords: (43.08, -70.82),
+        altitude: 30.,
+        name: String::from("KPSM"),
+    };
+
+    let local_conditions = wxer_query("local", "hourly").await?;
+    let psm_conditions = wxer_query("psm", "hourly").await?;
 
     // dbg!(&local_conditions);
     // dbg!(&psm_conditions);
 
-    let local_conditions: BTreeMap<DateTime<Utc>, StationEntry> = serde_json::from_str(&local_conditions).map_err(|e| e.to_string())?;
-    let psm_conditions: BTreeMap<DateTime<Utc>, StationEntry> = serde_json::from_str(&psm_conditions).map_err(|e| e.to_string())?;
+    let local_db: BTreeMap<DateTime<Utc>, StationEntry> = serde_json::from_str(&local_conditions).map_err(|e| e.to_string())?;
+    let psm_db: BTreeMap<DateTime<Utc>, StationEntry> = serde_json::from_str(&psm_conditions).map_err(|e| e.to_string())?;
 
     let mut s = title("CURRENT CONDITIONS");
 
-    let latest_local = local_conditions.last_key_value()
+    let latest_local = local_db.last_key_value()
         .ok_or(String::from("Local json did not have any values"))?;
 
-    let latest_psm = psm_conditions.last_key_value()
+    let latest_psm = psm_db.last_key_value()
         .ok_or(String::from("PSM json did not have any values"))?;
 
 
     let apt_time: DateTime<Local> = DateTime::from(latest_local.0.clone());
     let apt_temp = latest_local.1.indoor_temperature.unwrap_or(f32::NAN);
     let apt_temp_style = indoor_temp_style(apt_temp);
-    let apt_temp_change = Trend::from_db(&local_conditions, 
-        |data| {&data.indoor_temperature}, 
+    let apt_temp_change = Trend::from_db(&local_db, 
+        |data| {data.indoor_temperature}, 
                 (chrono::Duration::hours(2), 2.),
-                (chrono::Duration::minutes(15), 2., chrono::Duration::hours(1), 2.));
+                (chrono::Duration::hours(1), 2., chrono::Duration::hours(1), 2.));
 
-    let apt_pressure = latest_local.1.sea_level_pressure.unwrap_or(f32::NAN);
+    let apt_pressure = latest_local.1.slp(&local_station).unwrap_or(f32::NAN);
     let apt_pressure_style = mslp_style(apt_pressure);
-    let apt_pres_change = Trend::from_db(&local_conditions, 
-        |data| {&data.sea_level_pressure}, 
+    let apt_pres_change = Trend::from_db(&local_db, 
+        |data| {data.sea_level_pressure}, 
                 (chrono::Duration::hours(6), 3.),
-                (chrono::Duration::minutes(15), 1., chrono::Duration::hours(3), 2.));
+                (chrono::Duration::hours(1), 1., chrono::Duration::hours(3), 2.));
+    
+    let psm_line = station_line(latest_psm.0, latest_psm.1, &psm_station, &psm_db)?;
 
-    let psm_time: DateTime<Local> = DateTime::from(latest_psm.0.clone());
-    let psm_temp = latest_psm.1.temperature_2m.unwrap_or(f32::NAN);
-    let psm_temp_style = outdoor_temp_style(psm_temp);
-    let psm_temp_change = Trend::from_db(&psm_conditions, 
-        |data| {&data.temperature_2m}, 
-                (chrono::Duration::hours(2), 4.),
-                (chrono::Duration::minutes(15), 2., chrono::Duration::hours(1), 4.));
-
-    let psm_pressure = latest_psm.1.sea_level_pressure.unwrap_or(f32::NAN);
-    let psm_pressure_style = mslp_style(apt_pressure);
-    let psm_pres_change = Trend::from_db(&psm_conditions, 
-        |data| {&data.sea_level_pressure}, 
-                (chrono::Duration::hours(6), 3.),
-                (chrono::Duration::minutes(15), 1., chrono::Duration::hours(3), 2.));
-
-    let psm_wx = format_wx(latest_psm.1.present_wx.clone());
-    let psm_dew = format_dewpoint(latest_psm.1);
-    let psm_wind = format_wind(latest_psm.1);
-
-    let psm_cloud = format_cloud(latest_psm.1);
-    let psm_metar = format!("{Bold}{}{Reset}", latest_psm.1.raw_metar.clone().unwrap_or("N/A".into()));
-    let psm_visibility = format_visibility(latest_psm.1);
-
-    let apt_psm_pres_diff = psm_pressure - apt_pressure;
-
-            
-    // let psm_time: DateTime<Local> = DateTime::from_utc(latest_psm.0);
-    // TODO: UTC to Local
-
-
-    s.push_str(&format!("Apt:  ⌛{} Temp: {apt_temp_style}{apt_temp:.0}°F{apt_temp_change}{Reset} {apt_pressure_style}{apt_pressure:.1}{apt_pres_change}{Reset} {Bold}{apt_psm_pres_diff:.2} mbar{Reset}\n", apt_time.format("%I:%M %p")));
-    s.push_str(&format!("KPSM: ⌛{} Temp: {psm_temp_style}{psm_temp:.0}°F{psm_temp_change}{Reset} {psm_pressure_style}{psm_pressure:.1}{psm_pres_change}{Reset}", psm_time.format("%I:%M %p")));
-    s.push_str(&format!(" {psm_wx} Dew:{psm_dew}\n\tWind: {psm_wind} Clouds: {psm_cloud} Vis: {psm_visibility}\nMETAR: {psm_metar}\n"));
-    s.push_str(&format!("\nPressure diffs: "));
-        
-    let mut diffs = vec![];
-
-    for metar_msmts in psm_conditions {
-        let same_time_local = local_conditions.get(&metar_msmts.0);
-
-        if let Some(t) = same_time_local {
-            let diff = metar_msmts.1.sea_level_pressure.unwrap_or(f32::NAN) - t.sea_level_pressure.unwrap_or(f32::NAN);
-            s.push_str(&format!("{}: {Bold}{:.2}{Reset}mb, ", metar_msmts.0.format("%d %H:%MZ"), diff));
-            // s.push_str(&format!("{:.2}\n", diff))
-            diffs.push(diff);
-        }
-        
-    }
-
-    diffs.remove(0);
-
-    s.push_str(&format!("Avg: {Bold}{:.3}{Reset}mb", diffs.iter().sum::<f32>() / diffs.len() as f32));
-
+    s.push_str(&format!("Apt: ⌛{} Temp: {apt_temp_style}{apt_temp:.0}°F{apt_temp_change}{Reset} {apt_pressure_style}{apt_pressure:.1}{apt_pres_change}{Reset}\n", apt_time.format("%I:%M %p")));
+    s.push_str(&psm_line);
 
     Ok(s)   
 
