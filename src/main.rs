@@ -5,7 +5,7 @@ use home::home_dir;
 use rand::{self, Rng, thread_rng, rngs::ThreadRng};
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{self, Value};
 use tokio;
 
 use wxer_lib::*;
@@ -411,14 +411,6 @@ async fn wxer_query(loc: &str, time: &str) -> Result<String, String> {
     Err(format!("None of the addresses responded successfully!\n{err_string}"))
 }
 
-
-async fn current_conditions_wrapper() {
-    match current_conditions().await {
-        Ok(s) => {println!("{}", s)},
-        Err(e) => {println!("{}{}", title("CURRENT CONDITIONS"), e)},
-    }
-}
-
 fn indoor_temp_style(temp: f32) -> String {
 
     if temp.is_nan() {
@@ -652,7 +644,7 @@ fn format_dewpoint(s: &StationEntry) -> String {
                 Style::new(&[Bold])
             };
 
-            dew_text = format!("{a:.0}°F");
+            dew_text = format!("{a:.0}F");
         }
         None => {
             dew_text = String::from("  N/A   ");
@@ -679,7 +671,7 @@ fn format_dewpoint(s: &StationEntry) -> String {
                 Style::new(&[YellowBg, Black, Bold])
             };
 
-            rh_text = format!("{a:4.1}%");
+            rh_text = format!("{a:.0}%");
 
         }
         None => {
@@ -801,8 +793,7 @@ fn format_column_width(s: String) -> String {
 fn format_metar(e: &StationEntry) -> String {
     let mut s = e.raw_metar.clone().unwrap_or("N/A".into());
     s = format!("METAR: {s}");
-    s = format_column_width(s);
-    format!("{Bold}{s}{Reset}")
+    format_column_width(s)
 }
 
 fn station_line(dt: &DateTime<Utc>, e: &StationEntry, station: &Station,
@@ -832,13 +823,13 @@ fn station_line(dt: &DateTime<Utc>, e: &StationEntry, station: &Station,
     let metar = format_metar(e);
     let visibility = format_visibility(e);
 
-    s.push_str(&format!("{}: ⌛{} Temp: {temp_style}{temp:.0}°F{temp_change}{Reset} {pressure_style}{pressure:.1}{pres_change}{Reset}", station.name, time.format("%I:%M %p")));
-    s.push_str(&format!(" {wx} Dew:{dew}\n    Wind: {wind} Vis: {visibility}\n{metar}\nClouds: {cloud}\n"));
+    s.push_str(&format!("{}: ⌛{} Temp: {temp_style}{temp:.0}F{temp_change}{Reset} Pres: {pressure_style}{pressure:.1}{pres_change}{Reset}", station.name, time.format("%I:%M %p")));
+    s.push_str(&format!(" {wx} Dew: {dew}\n    Wind: {wind} Vis: {visibility}\n{metar}\n    Clouds: {cloud}\n"));
         
     Ok(s)
 }
 
-async fn current_conditions() -> Result<String, String> {
+async fn current_conditions_handler() -> Result<String, String> {
 
     let local_station = Station {
         coords: (43.00, 0.0), // im not giving that away
@@ -887,12 +878,100 @@ async fn current_conditions() -> Result<String, String> {
     
     let psm_line = station_line(latest_psm.0, latest_psm.1, &psm_station, &psm_db)?;
 
-    s.push_str(&format!("Apt: ⌛{} Temp: {apt_temp_style}{apt_temp:.0}°F{apt_temp_change}{Reset} {apt_pressure_style}{apt_pressure:.1}{apt_pres_change}{Reset}\n", apt_time.format("%I:%M %p")));
+    s.push_str(&format!("Apt:  ⌛{} Temp: {apt_temp_style}{apt_temp:.0}F{apt_temp_change}{Reset} Pres: {apt_pressure_style}{apt_pressure:.1}{apt_pres_change}{Reset}\n", apt_time.format("%I:%M %p")));
     s.push_str(&psm_line);
 
     Ok(s)   
 
 }
+
+async fn current_conditions() {
+    match current_conditions_handler().await {
+        Ok(s) => {println!("{}", s)},
+        Err(e) => {println!("{}{}", title("CURRENT CONDITIONS"), e)},
+    }
+}
+
+// FORECAST --------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+struct OpenMeteoResponse {
+    hourly: OpenMeteoResponseHourly
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenMeteoResponseHourly {
+    #[serde(rename="visibility[mile]")]
+    time: Vec<DateTime<Utc>>,
+    #[serde(rename="dew_point_2m")]
+    dewpoint_2m: Vec<f64>,
+    #[serde(rename="apparent_temperature")]
+    feels_like: Vec<f64>,
+    #[serde(rename="precipitation_probability")]
+    precip_probability: Vec<f64>,
+    #[serde(rename="precip")]
+    precip: Vec<f64>,
+    #[serde(rename="rain")]
+    rain: Vec<f64>,
+    #[serde(rename="snowfall")]
+    snowfall: Vec<f64>, // get rid of this if it is all zero
+    #[serde(rename="pressure_msl")]
+    sea_level_pressure: Vec<f64>,
+    #[serde(rename="cloud_cover")]
+    cloud_cover: Vec<f64>,
+    #[serde(rename="wind_speed_10m")]
+    wind_speed_10m: Vec<f64>,
+    #[serde(rename="cape")]
+    cape: Vec<f64>,
+    #[serde(rename="windspeed_250hPa")]
+    wind_speed_250mb: Vec<f64>,
+    #[serde(rename="geopotential_height_500hpa")]
+    height_500mb: Vec<f64>
+}
+
+async fn get_open_meteo(s: &Station) -> Result<OpenMeteoResponse, String> {
+
+    let lat = s.coords.0;
+    let long = s.coords.1;
+
+    let url = format!("https://api.open-meteo.com/v1/forecast?latitude={lat:.2}&longitude={long:.2}&hourly=temperature_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,rain,snowfall,pressure_msl,cloud_cover,wind_speed_10m,cape,windspeed_250hPa,geopotential_height_500hPa&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch");
+
+    let client = reqwest::Client::new();
+
+    let q = client.get(&url)
+                .timeout(Duration::from_secs(10))
+                .send()
+                .await;
+
+    let r = q.map_err(|e| e.to_string())?;
+
+    let t = r.text().await.map_err(|e| e.to_string())?;
+   
+    serde_json::from_str(&t).map_err(|e| e.to_string())?
+}
+
+async fn forecast_handler() -> Result<String, String> {
+    let mut s = title("FORECAST");
+
+    let psm_station = Station {
+        coords: (43.08, -70.82),
+        altitude: 30.,
+        name: String::from("KPSM"),
+    };
+
+
+    let r = get_open_meteo(&psm_station).await?;
+
+    Ok(s)
+}
+
+async fn forecast() {
+    match forecast_handler().await {
+        Ok(s) => {println!("{}", s)},
+        Err(e) => {println!("{}{}", title("FORECAST"), e)},
+    }
+}
+
 
 
 #[tokio::main] 
@@ -904,25 +983,27 @@ async fn main() {
 
     futures::join!(
         solar_lunar(), 
-        current_conditions_wrapper(),
-        // current_conditions_wrapper()
-    );
+        current_conditions(),
+        forecast(),
+
+        // time_and_date();
+
+        // forecast_analysis();
+        // climatology();
+        // stock_market();
+
+        // on hold, seavey island API doesn't work
+        //https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=8419870&product=predictions&datum=STND&time_zone=gmt&interval=hilo&units=english&format=json
+        // tides();
         
+        
+        // teleconnections();
 
-    // time_and_date();
+        // earthquakes();
 
-    // forecast();
-    // forecast_analysis();
-    // climatology();
-    // stock_market();
-
-    //https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=8419870&product=predictions&datum=STND&time_zone=gmt&interval=hilo&units=english&format=json
-    // tides();
+    );
     
-    
-    // teleconnections();
 
-    // earthquakes();
 
 }
 
