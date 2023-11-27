@@ -998,14 +998,15 @@ async fn forecast_handler() -> Result<String, String> {
     // iterate over every day from now until 5 days from now
     for day in (1..=5).map(|d| today + chrono::Duration::days(d)) {
         let afternoon = NaiveTime::from_hms_opt(13,0,0).unwrap(); // 1PM
-        let naive_dt = day.and_time(afternoon);
-        let local_dt = TimeZone::from_local_datetime(&Local, &naive_dt)
+        let naive_dt: NaiveDateTime = day.and_time(afternoon);
+        
+        let local_dt: DateTime<Local> = TimeZone::from_local_datetime(&Local, &naive_dt)
                                     .single()
                                     .unwrap_or_default(); // idk how to deal with the None situation.
                                     // I don't think it's possible in this case
-        let utc_dt: DateTime<Utc> = DateTime::from(local_dt);
+        let utc_dt: DateTime<Utc> = local_dt.into();
 
-        let hourly = &r.hourly;
+        let hourly: &OpenMeteoResponseHourly = &r.hourly;
 
         let idx_result: Result<usize, usize> = hourly.time.binary_search(&utc_dt);
 
