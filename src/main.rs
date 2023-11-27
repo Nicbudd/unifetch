@@ -1,6 +1,6 @@
 use std::{fmt, collections::{HashMap, BTreeMap}, time::Duration, fs};
 
-use chrono::{Local, Utc, NaiveDate, NaiveTime, DateTime};
+use chrono::{Local, Utc, NaiveDate, NaiveTime, DateTime, TimeZone, NaiveDateTime};
 use home::home_dir;
 use rand::{self, Rng, thread_rng, rngs::ThreadRng};
 
@@ -894,22 +894,45 @@ async fn current_conditions() {
 
 // FORECAST --------------------------------------------------------------------
 
+fn from_iso8601_no_seconds<'de, D>(des: D) -> Result<Vec<DateTime<Utc>>, D::Error> 
+    where D: serde::Deserializer<'de> {
+
+    let v: Vec<String> = Vec::deserialize(des)?;
+
+    // dbg!(&v);
+    
+    let v_dt: Vec<DateTime<Utc>> = v.iter()
+        .map(|s| {
+            let naive = NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M");
+            let naive = naive.map_err(serde::de::Error::custom)?;
+            Ok(Utc::from_utc_datetime(&Utc, &naive))
+        })
+        .collect::<Result<Vec<DateTime<Utc>>, _>>()?; 
+    
+    // dbg!(&v_dt);
+
+    Ok(v_dt)
+}
+
 #[derive(Debug, Deserialize)]
 struct OpenMeteoResponse {
+    latitude: f64,
     hourly: OpenMeteoResponseHourly
 }
 
 #[derive(Debug, Deserialize)]
 struct OpenMeteoResponseHourly {
-    #[serde(rename="visibility[mile]")]
+    #[serde(deserialize_with="from_iso8601_no_seconds")]
     time: Vec<DateTime<Utc>>,
+    #[serde(rename="temperature_2m")]
+    temperature_2m: Vec<f64>,
     #[serde(rename="dew_point_2m")]
     dewpoint_2m: Vec<f64>,
     #[serde(rename="apparent_temperature")]
     feels_like: Vec<f64>,
     #[serde(rename="precipitation_probability")]
     precip_probability: Vec<f64>,
-    #[serde(rename="precip")]
+    #[serde(rename="precipitation")]
     precip: Vec<f64>,
     #[serde(rename="rain")]
     rain: Vec<f64>,
@@ -925,7 +948,7 @@ struct OpenMeteoResponseHourly {
     cape: Vec<f64>,
     #[serde(rename="windspeed_250hPa")]
     wind_speed_250mb: Vec<f64>,
-    #[serde(rename="geopotential_height_500hpa")]
+    #[serde(rename="geopotential_height_500hPa")]
     height_500mb: Vec<f64>
 }
 
@@ -935,6 +958,8 @@ async fn get_open_meteo(s: &Station) -> Result<OpenMeteoResponse, String> {
     let long = s.coords.1;
 
     let url = format!("https://api.open-meteo.com/v1/forecast?latitude={lat:.2}&longitude={long:.2}&hourly=temperature_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,rain,snowfall,pressure_msl,cloud_cover,wind_speed_10m,cape,windspeed_250hPa,geopotential_height_500hPa&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch");
+
+    // dbg!(&url);
 
     let client = reqwest::Client::new();
 
@@ -946,8 +971,10 @@ async fn get_open_meteo(s: &Station) -> Result<OpenMeteoResponse, String> {
     let r = q.map_err(|e| e.to_string())?;
 
     let t = r.text().await.map_err(|e| e.to_string())?;
+
+    // dbg!(&t);
    
-    serde_json::from_str(&t).map_err(|e| e.to_string())?
+    serde_json::from_str(&t).map_err(|e| e.to_string())
 }
 
 async fn forecast_handler() -> Result<String, String> {
@@ -959,8 +986,39 @@ async fn forecast_handler() -> Result<String, String> {
         name: String::from("KPSM"),
     };
 
+    // dbg!("hello");
 
     let r = get_open_meteo(&psm_station).await?;
+
+    // dbg!(&r);
+
+    let now = Local::now();
+    let today = now.date_naive();
+    
+    // iterate over every day from now until 5 days from now
+    for day in (1..=5).map(|d| today + chrono::Duration::days(d)) {
+        let afternoon = NaiveTime::from_hms_opt(13,0,0).unwrap(); // 1PM
+        let naive_dt = day.and_time(afternoon);
+        let local_dt = TimeZone::from_local_datetime(&Local, &naive_dt)
+                                    .single()
+                                    .unwrap_or_default(); // idk how to deal with the None situation.
+                                    // I don't think it's possible in this case
+        let utc_dt: DateTime<Utc> = DateTime::from(local_dt);
+
+        let hourly = &r.hourly;
+
+        let idx_result: Result<usize, usize> = hourly.time.binary_search(&utc_dt);
+
+        let idx = match idx_result {
+            Ok(s) => s,
+            Err(e) => e
+        };
+
+        let dewpoint = hourly.dewpoint_2m[idx];
+
+        s.push_str(&format!("{}: Dewp: {Bold}{dewpoint:.0}°F{Reset}\n", local_dt.format("%a %l%p")));
+    }
+
 
     Ok(s)
 }
