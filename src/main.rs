@@ -1040,7 +1040,7 @@ async fn main() {
     head_matter();
     random_section();
 
-    futures::join!(
+    tokio::join!(
         solar_lunar(), 
         current_conditions(),
         forecast(),
