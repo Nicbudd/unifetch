@@ -1,4 +1,4 @@
-use std::{fmt, collections::{HashMap, BTreeMap}, time::Duration, fs};
+use std::{fmt, collections::{HashMap, BTreeMap}, time::Duration, fs, f32::consts::E};
 
 use chrono::{Local, Utc, NaiveDate, NaiveTime, DateTime, TimeZone, NaiveDateTime};
 use home::home_dir;
@@ -411,57 +411,6 @@ async fn wxer_query(loc: &str, time: &str) -> Result<String, String> {
     Err(format!("None of the addresses responded successfully!\n{err_string}"))
 }
 
-fn indoor_temp_style(temp: f32) -> String {
-
-    if temp.is_nan() {
-        Style::new(&[Red, Bold])
-    } else {
-        if temp < 65. {
-            Style::new(&[BlueBg, Bold])
-        } else if temp < 75. {
-            Style::new(&[NoStyle, Bold])
-        } else {
-            Style::new(&[RedBg, Bold])
-        }
-    }
-}
-
-fn outdoor_temp_style(temp: f32) -> String {
-    if temp.is_nan() {
-        Style::new(&[Red, Bold])
-    } else {
-        if temp < 10. {
-            Style::new(&[PurpleBg, Bold])
-        } else if temp < 32. {
-            Style::new(&[BlueBg, Bold])
-        } else if temp < 55. {
-            Style::new(&[GreenBg, Black, Bold])
-        } else if temp < 70. {
-            Style::new(&[YellowBg, Black, Bold])
-        } else if temp < 85. {
-            Style::new(&[RedBg, Bold])
-        } else if temp < 95. {
-            Style::new(&[WhiteBg, Red, Bold])
-        } else {
-            Style::new(&[PurpleBg, Red, Bold])
-        }
-    }
-}
-
-fn mslp_style(pres: f32) -> String {
-    if pres.is_nan() {
-        Style::new(&[Red, Bold])
-    } else {
-        if pres < 1005. {
-            Style::new(&[RedBg, Black, Bold])
-        } else if pres > 1025. {
-            Style::new(&[BlueBg, Black, Bold])
-        } else {
-            Style::new(&[Bold])
-        }
-    }
-}
-
 enum Trend {
     Rising,
     Falling,
@@ -543,7 +492,7 @@ impl Trend {
             Falling => " ↘",
             RapidlyRising => " ⬆",
             RapidlyFalling => " ⬇",
-            UnknownChange => " ?",
+            UnknownChange => "",
             Neutral => " ➡"
         }
     }
@@ -555,6 +504,45 @@ impl fmt::Display for Trend {
     }
 }
 
+
+
+#[derive(Debug)]
+struct WeatherData {
+    title: String,
+    text: String,
+    style: String,
+}
+
+impl fmt::Display for WeatherData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_none() {
+            write!(f, "")
+        } else {
+            write!(f, "{}: {}{}{Reset}", self.title, self.style, self.text)
+        }
+    }
+}
+
+impl WeatherData {
+    fn len(&self) -> usize {
+        if self.is_none() {
+            0
+        } else {
+            self.title.len() + 2 + self.text.len()
+            // Temp: 38F
+        }
+    }
+
+    fn none() -> Self {
+        WeatherData {title: String::new(), text: String::new(), style: String::new()}
+    }
+
+    fn is_none(&self) -> bool {
+        return self.text.len() == 0;
+    }
+}
+
+
 #[derive(Debug, PartialEq)]
 enum WxCategory {
     Snow,
@@ -565,14 +553,13 @@ enum WxCategory {
     None
 }
 
-fn format_wx(o: Option<Vec<String>>) -> String {
+fn format_wx(o: Option<Vec<String>>) -> WeatherData {
     let mut text: String;
     let mut style: String;
 
     match o {
         None => {
-            text = String::from("");
-            style = Style::new(&[Red, Bold]);
+            return WeatherData::none();
         },
         Some(v) => {
             let mut wx_types = vec![];
@@ -619,18 +606,18 @@ fn format_wx(o: Option<Vec<String>>) -> String {
         style = Style::new(&[Bold])
     }
 
-    format!("{style}{text}{Reset}")
+    WeatherData {title: "WX".into(), text, style}
 
 
 }
 
 
-fn format_dewpoint(s: &StationEntry) -> String {
+fn format_dewpoint(s: &StationEntry) -> (WeatherData, WeatherData) {
     let dew_text: String;
     let dew_style: String;
 
     if s.dewpoint_2m.is_none() {
-        return String::from("");
+        return (WeatherData::none(), WeatherData::none());
     }
 
     let a = s.dewpoint_2m.unwrap();
@@ -677,16 +664,16 @@ fn format_dewpoint(s: &StationEntry) -> String {
         }
     }
 
-    format!("{dew_style}{dew_text}{Reset} ({rh_style}{rh_text}{Reset})")
+    (WeatherData{title: "Dew".into(), text: dew_text, style: dew_style}, WeatherData{title: "RH".into(), text: rh_text, style: rh_style})
 
 } 
 
-fn format_wind(s: &StationEntry) -> String {
+fn format_wind(s: &StationEntry) -> WeatherData {
     let text: String;
     let style: String;
 
     if s.wind_10m.is_none() {
-        return String::from("");
+        return WeatherData::none();
     }
 
     let a = s.wind_10m.unwrap();
@@ -703,10 +690,16 @@ fn format_wind(s: &StationEntry) -> String {
         Style::new(&[Bold])
     };
 
-    format!("{style}{:03}({})@{:2}kts{Reset}", a.direction.degrees(), a.direction.cardinal(), a.speed)
+    text = if a.speed > 0. {
+        format!("{:03}({})@{:2.0}kts", a.direction.degrees(), a.direction.cardinal(), a.speed)
+    } else {
+        String::from("Calm")
+    };
+
+    WeatherData {title: "Wind".into(), text, style}
 }
 
-fn format_cloud(s: &StationEntry) -> String {
+fn format_cloud(s: &StationEntry) -> WeatherData {
     let text: String;
     let style: String;
 
@@ -736,15 +729,15 @@ fn format_cloud(s: &StationEntry) -> String {
         }
     }
 
-    format!("{style}{text}{Reset}")
+    WeatherData{title: "Clouds".into(), text, style}
 }
 
-fn format_visibility(e: &StationEntry) -> String {
+fn format_visibility(e: &StationEntry) -> WeatherData {
     let text: String;
     let style: String;
 
     match e.visibility {
-        None => {return String::new()},
+        None => return WeatherData::none(),
         Some(v) => {
             if v <= 1. {
                 style = Style::new(&[WhiteBg, Black, Bold]);
@@ -761,49 +754,84 @@ fn format_visibility(e: &StationEntry) -> String {
         }
     }
 
-    format!("{style}{text}{Reset}")
+    WeatherData {title: "Vis".into(), text, style}
 
 }
-
-// fn format_column_width(s: String) -> String {
-//     const INDENTATION_SPACES: usize = 2;
-//     const COLUMN_WIDTH: usize = 80;
-//     const WIDTH: usize = COLUMN_WIDTH - INDENTATION_SPACES;
-
-//     s.chars()
-//     .enumerate()
-//     .fold(String::new(),|mut a, (i, x)| {
-//         if i % (WIDTH) == 0 {
-//             for j in 0..INDENTATION_SPACES {
-//                 a.push(' ');
-//             }
-//             a.push(x);
-//         } else if i % (WIDTH) == (WIDTH - 1) {
-//             a.push(x);
-//             a.push('\n');
-//         } else {
-//             a.push(x);
-//         }
-
-//         a
-//     })
-// }
 
 fn format_metar(e: &StationEntry) -> String {
     let s = e.raw_metar.clone();
     match s {
-        Some(m) => format!("METAR: {m}"),
-        None => String::new()
+        Some(text) => { 
+            let mut metar_string = String::from("\n  METAR:");
+            let mut metar_length = metar_string.len();
+            
+            for s in text.split_ascii_whitespace() {
+                let new_len = metar_length + 1 + s.len();
+
+                if new_len <= COLUMN_WIDTH { 
+                    metar_string.push(' ');
+                    metar_string.push_str(&s.to_string());
+                    metar_length = new_len;
+                } else {
+                    metar_string.push_str("\n    ");
+                    metar_string.push_str(&s.to_string());
+                    metar_length = 4 + s.len();
+                }
+            }
+
+            metar_string
+
+        }
+        None => {String::new()}
     }
 }
 
-fn format_temp(e: &StationEntry, indoor: bool, db: &BTreeMap<DateTime<Utc>, StationEntry>) -> String {
+
+
+fn indoor_temp_style(temp: f32) -> String {
+    if temp.is_nan() {
+        Style::new(&[Red, Bold])
+    } else {
+        if temp < 65. {
+            Style::new(&[BlueBg, Bold])
+        } else if temp < 75. {
+            Style::new(&[NoStyle, Bold])
+        } else {
+            Style::new(&[RedBg, Bold])
+        }
+    }
+}
+
+fn outdoor_temp_style(temp: f32) -> String {
+    if temp.is_nan() {
+        Style::new(&[Red, Bold])
+    } else {
+        if temp < 10. {
+            Style::new(&[PurpleBg, Bold])
+        } else if temp < 32. {
+            Style::new(&[BlueBg, Bold])
+        } else if temp < 55. {
+            Style::new(&[GreenBg, Black, Bold])
+        } else if temp < 70. {
+            Style::new(&[YellowBg, Black, Bold])
+        } else if temp < 85. {
+            Style::new(&[RedBg, Bold])
+        } else if temp < 95. {
+            Style::new(&[WhiteBg, Red, Bold])
+        } else {
+            Style::new(&[PurpleBg, Red, Bold])
+        }
+    }
+}
+
+fn format_temp(e: &StationEntry, indoor: bool, db: &BTreeMap<DateTime<Utc>, StationEntry>) -> WeatherData {
     
     let temp = if indoor {
         e.indoor_temperature
     } else {
         e.temperature_2m
     };
+
 
     let temp_change = if indoor {
         Trend::from_db(&db, 
@@ -818,70 +846,99 @@ fn format_temp(e: &StationEntry, indoor: bool, db: &BTreeMap<DateTime<Utc>, Stat
     };
     
     if let Some(temp) = temp {
-        let temp_style = outdoor_temp_style(temp);
-        format!("Temp: {temp_style}{temp:.0}F{temp_change}{Reset}")
+
+        let style = if indoor {
+            indoor_temp_style(temp)
+        } else {
+            outdoor_temp_style(temp)
+        };
+
+        WeatherData{title: "Temp".into(), style, text: format!("{temp:.0}F{temp_change}")}
     } else {
-        String::new()
+        WeatherData::none()
     }
 }
 
-fn format_pressure(e: &StationEntry, station: &Station, db: &BTreeMap<DateTime<Utc>, StationEntry>) -> String {
+
+
+
+fn mslp_style(pres: f32) -> String {
+    if pres.is_nan() {
+        Style::new(&[Red, Bold])
+    } else {
+        if pres < 1005. {
+            Style::new(&[RedBg, Black, Bold])
+        } else if pres > 1025. {
+            Style::new(&[BlueBg, Black, Bold])
+        } else {
+            Style::new(&[Bold])
+        }
+    }
+}
+
+fn format_pressure(e: &StationEntry, station: &Station, db: &BTreeMap<DateTime<Utc>, StationEntry>) -> WeatherData {
     if let Some(pressure) = e.slp(&station) {
-        let pressure_style = mslp_style(pressure);
+        let style = mslp_style(pressure);
         let pres_change = Trend::from_db(&db, 
             |data| {data.slp(&station)}, 
             (chrono::Duration::hours(6), 3.),
             (chrono::Duration::minutes(15), 1., chrono::Duration::hours(3), 2.));
         
-        format!("Pres: {pressure_style}{pressure:.1}{pres_change}{Reset}")
+        WeatherData{title: "Pres".into(), text: format!("{pressure:.1}{pres_change}"), style}
+
     } else {
-        String::new()
+        WeatherData::none()
     }
 }
 
-fn station_line(dt: &DateTime<Utc>, e: &StationEntry, station: &Station, indoor: bool,
+
+const COLUMN_WIDTH: usize = 80;
+
+
+fn station_line(prelude: &str, e: &StationEntry, station: &Station, indoor: bool,
   db: &BTreeMap<DateTime<Utc>, StationEntry>) -> Result<String, String> {
 
-    let mut string_vec: Vec<String> = vec![];
+    let mut string_vec: Vec<WeatherData> = vec![];
 
     let mut total_string = String::new();
 
-    let time: DateTime<Local> = DateTime::from(dt.clone());
+    let (dewpoint, rh) = format_dewpoint(e);
 
     string_vec.push(format_temp(e, indoor, db));
     string_vec.push(format_pressure(e, station, db));
-    string_vec.push(format_wx(e.present_wx.clone()));
-    string_vec.push(format_dewpoint(e));
-    string_vec.push(format_wind(e));
+    string_vec.push(dewpoint);
+    string_vec.push(rh);
     string_vec.push(format_visibility(e));
+    string_vec.push(format_wx(e.present_wx.clone()));
+    string_vec.push(format_wind(e));
     string_vec.push(format_cloud(e));
-    string_vec.push(format_metar(e));
-    
-    total_string.push_str(&format!("{}: ⌛{}", station.name, time.format("%I:%M %p")));
 
-    dbg!(&string_vec);
+    total_string.push_str(prelude);
 
     let mut line_length = total_string.len();
-    for s in string_vec {
-        let new_len = total_string.len() + 1 + s.len();
+
+    for data in string_vec {
+        let new_len = line_length + 1 + data.len();
         
-        if s.len() == 0 {
+        // dbg!(&data, data.len(), new_len);
+
+        if data.is_none() {
             continue;
-        } else if line_length <= 80 {
+        } else if new_len <= COLUMN_WIDTH {
             total_string.push(' ');
-            total_string.push_str(&s);
+            total_string.push_str(&data.to_string());
             line_length = new_len;
         } else {
             total_string.push_str("\n  ");
-            total_string.push_str(&s);
-            line_length = 2;
+            total_string.push_str(&data.to_string());
+            line_length = 2 + data.len();
         };
     }
 
-    total_string.push_str("\n\n\n\n\n");
-    // s.push_str(&format!(""));
-    // s.push_str(&format!(" {wx} Dew: {dew}\n    Wind: {wind} Vis: {visibility}\n{metar}\n    Clouds: {cloud}\n"));
-        
+    total_string.push_str(&format_metar(e));
+    
+    total_string.push('\n');
+
     Ok(total_string)
 }
 
@@ -916,8 +973,11 @@ async fn current_conditions_handler() -> Result<String, String> {
     let latest_psm = psm_db.last_key_value()
         .ok_or(String::from("PSM json did not have any values"))?;
 
-    let apt_line = station_line(latest_apt.0, latest_apt.1, &apt_station, true, &psm_db)?;
-    let psm_line = station_line(latest_psm.0, latest_psm.1, &psm_station, true, &psm_db)?;
+    let apt_prelude = format!("{}: ⌛{}", apt_station.name, latest_apt.0.format("%I:%M %p"));
+    let psm_prelude = format!("{}: ⌛{}", psm_station.name, latest_psm.0.format("%I:%M %p"));
+
+    let apt_line = station_line(&apt_prelude, latest_apt.1, &apt_station, true, &psm_db)?;
+    let psm_line = station_line(&psm_prelude, latest_psm.1, &psm_station, false, &psm_db)?;
 
     s.push_str(&apt_line);
     s.push_str(&psm_line);
@@ -966,31 +1026,35 @@ struct OpenMeteoResponseHourly {
     #[serde(deserialize_with="from_iso8601_no_seconds")]
     time: Vec<DateTime<Utc>>,
     #[serde(rename="temperature_2m")]
-    temperature_2m: Vec<f64>,
+    temperature_2m: Vec<f32>,
     #[serde(rename="dew_point_2m")]
-    dewpoint_2m: Vec<f64>,
+    dewpoint_2m: Vec<f32>,
     #[serde(rename="apparent_temperature")]
-    feels_like: Vec<f64>,
+    feels_like: Vec<f32>,
     #[serde(rename="precipitation_probability")]
-    precip_probability: Vec<f64>,
+    precip_probability: Vec<f32>,
     #[serde(rename="precipitation")]
-    precip: Vec<f64>,
+    precip: Vec<f32>,
     #[serde(rename="rain")]
-    rain: Vec<f64>,
+    rain: Vec<f32>,
     #[serde(rename="snowfall")]
-    snowfall: Vec<f64>, // get rid of this if it is all zero
+    snowfall: Vec<f32>, // get rid of this if it is all zero
     #[serde(rename="pressure_msl")]
-    sea_level_pressure: Vec<f64>,
+    sea_level_pressure: Vec<f32>,
     #[serde(rename="cloud_cover")]
-    cloud_cover: Vec<f64>,
+    cloud_cover: Vec<f32>,
     #[serde(rename="wind_speed_10m")]
-    wind_speed_10m: Vec<f64>,
+    wind_speed_10m: Vec<f32>,
+    #[serde(rename="wind_direction_10m")]
+    wind_dir_10m: Vec<u16>,
     #[serde(rename="cape")]
-    cape: Vec<f64>,
+    cape: Vec<f32>,
     #[serde(rename="windspeed_250hPa")]
-    wind_speed_250mb: Vec<f64>,
+    wind_speed_250mb: Vec<f32>,
     #[serde(rename="geopotential_height_500hPa")]
-    height_500mb: Vec<f64>
+    height_500mb: Vec<f32>,
+    #[serde(rename="visibility")]
+    visibility: Vec<f32>
 }
 
 async fn get_open_meteo(s: &Station) -> Result<OpenMeteoResponse, String> {
@@ -998,7 +1062,7 @@ async fn get_open_meteo(s: &Station) -> Result<OpenMeteoResponse, String> {
     let lat = s.coords.0;
     let long = s.coords.1;
 
-    let url = format!("https://api.open-meteo.com/v1/forecast?latitude={lat:.2}&longitude={long:.2}&hourly=temperature_2m,dew_point_2m,apparent_temperature,precipitation_probability,precipitation,rain,snowfall,pressure_msl,cloud_cover,wind_speed_10m,cape,windspeed_250hPa,geopotential_height_500hPa&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch");
+    let url = format!("https://api.open-meteo.com/v1/forecast?latitude={lat:.2}&longitude={long:.2}&hourly=temperature_2m,dew_point_2m,visibility,apparent_temperature,precipitation_probability,precipitation,rain,snowfall,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m,cape,windspeed_250hPa,geopotential_height_500hPa&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch");
 
     // dbg!(&url);
 
@@ -1018,6 +1082,63 @@ async fn get_open_meteo(s: &Station) -> Result<OpenMeteoResponse, String> {
     serde_json::from_str(&t).map_err(|e| e.to_string())
 }
 
+fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<StationEntry> {
+
+    let mut entries: Vec<StationEntry> = vec![];
+
+    let hourly = open_meteo.hourly;
+
+    for (idx, date_time) in hourly.time.iter().enumerate() {
+        let temperature_2m = Some(hourly.temperature_2m[idx]);
+        let dewpoint_2m = Some(hourly.dewpoint_2m[idx]);
+        let sea_level_pressure = Some(hourly.sea_level_pressure[idx]);
+        let visibility = Some(hourly.visibility[idx] / 5280.);
+
+        let wind_10m;
+
+        let wind_dir_result = Direction::from_degrees(hourly.wind_dir_10m[idx]);
+        if wind_dir_result.is_err() {
+            wind_10m = None;
+        } else {
+            let wind_dir = wind_dir_result.unwrap();
+            wind_10m = Some(Wind {direction: wind_dir, speed: hourly.wind_speed_10m[idx]});
+        }
+
+        let rain = hourly.rain[idx];
+        let snow = hourly.snowfall[idx];
+        let unknown = hourly.precip[idx] - rain - snow;
+
+        let precip = Some(Precip {rain, snow, unknown}); 
+
+
+        let mut weather = vec![];
+        if rain > 0. {weather.push("RA".into())};
+        if snow > 0. {weather.push("SN".into())};
+        let present_wx = Some(weather);
+
+
+        let e = StationEntry { 
+            date_time: date_time.clone(), 
+            indoor_temperature: None, 
+            temperature_2m, 
+            dewpoint_2m, 
+            sea_level_pressure, 
+            wind_10m, 
+            skycover: None, 
+            visibility, 
+            precip_today: None, 
+            present_wx, 
+            raw_metar: None, 
+            raw_pressure: None 
+        };
+
+        entries.push(e);
+    }
+
+    entries
+
+}
+
 async fn forecast_handler() -> Result<String, String> {
     let mut s = title("FORECAST");
 
@@ -1027,40 +1148,49 @@ async fn forecast_handler() -> Result<String, String> {
         name: String::from("KPSM"),
     };
 
-    // dbg!("hello");
+    let now = Utc::now();
 
     let r = get_open_meteo(&psm_station).await?;
+    let entries = open_meteo_to_entries(r);
 
-    // dbg!(&r);
 
-    let now = Local::now();
-    let today = now.date_naive();
-    
-    // iterate over every day from now until 5 days from now
-    for day in (1..=5).map(|d| today + chrono::Duration::days(d)) {
-        let afternoon = NaiveTime::from_hms_opt(13,0,0).unwrap(); // 1PM
-        let naive_dt: NaiveDateTime = day.and_time(afternoon);
+
+    let mut included = BTreeMap::new();
+
+    for hours_from_now in [0, 1, 2, 3, 6, 12, 18, 24, 
+                            (24*1 + 0), (24*1 + 6), (24*1 + 12), (24*1 + 18),
+                            (24*2 + 0), (24*2 + 6), (24*2 + 12), (24*2 + 18),
+                            (24*3 + 0), (24*3 + 12),
+                            (24*4 + 0), (24*4 + 12),
+                            (24*5 + 0), (24*5 + 12),
+                            (24*6 + 0), (24*6 + 12),
+                            (24*7 + 0), (24*7 + 12)] {
+        let dt = now + chrono::Duration::hours(hours_from_now);
         
-        let local_dt: DateTime<Local> = TimeZone::from_local_datetime(&Local, &naive_dt)
-                                    .single()
-                                    .unwrap_or_default(); // idk how to deal with the None situation.
-                                    // I don't think it's possible in this case
-        let utc_dt: DateTime<Utc> = local_dt.into();
-
-        let hourly: &OpenMeteoResponseHourly = &r.hourly;
-
-        let idx_result: Result<usize, usize> = hourly.time.binary_search(&utc_dt);
-
-        let idx = match idx_result {
+        let entry_idx = entries.binary_search_by(|x| x.date_time.cmp(&dt));
+        let entry_idx = match entry_idx {
             Ok(s) => s,
-            Err(e) => e
+            Err(e) => {
+                if e == entries.len() {
+                    e - 1
+                } else {
+                    e
+                }
+            },
         };
 
-        let dewpoint = hourly.dewpoint_2m[idx];
+        let entry = entries.get(entry_idx).unwrap();
 
-        s.push_str(&format!("{}: Dewp: {Bold}{dewpoint:.0}°F{Reset}\n", local_dt.format("%a %l%p")));
+        included.insert(dt, entry);    
     }
 
+    for (dt, entry) in included {
+        let local_dt: DateTime<Local> = dt.into();
+        let prelude = format!("{}:", local_dt.format("%a %d %l%p"));
+        s.push_str(&station_line(&prelude, entry, &psm_station, false, &BTreeMap::new())?);
+    }
+
+    
 
     Ok(s)
 }
