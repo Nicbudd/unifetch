@@ -1,6 +1,8 @@
 use std::{fmt, collections::{HashMap, BTreeMap}, time::Duration, fs};
 
-use chrono::{Local, Utc, NaiveDate, NaiveTime, DateTime, TimeZone, NaiveDateTime};
+use chrono::{Local, Utc, NaiveDate, NaiveTime, DateTime, TimeZone, NaiveDateTime, Datelike};
+use chrono::Weekday::*;
+
 use home::home_dir;
 use rand::{self, Rng, thread_rng, rngs::ThreadRng};
 
@@ -517,6 +519,8 @@ impl fmt::Display for WeatherData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_none() {
             write!(f, "")
+        } else if self.title.len() == 0 {
+            write!(f, "{}{}{Reset}", self.style, self.text)
         } else {
             write!(f, "{}: {}{}{Reset}", self.title, self.style, self.text)
         }
@@ -606,7 +610,7 @@ fn format_wx(o: Option<Vec<String>>) -> WeatherData {
         style = Style::new(&[Bold])
     }
 
-    WeatherData {title: "WX".into(), text, style}
+    WeatherData {title: "".into(), text, style}
 
 
 }
@@ -859,6 +863,18 @@ fn format_temp(e: &StationEntry, indoor: bool, db: &BTreeMap<DateTime<Utc>, Stat
     }
 }
 
+fn format_apparent_temp(e: &StationEntry) -> WeatherData {
+    let apparent_temp = e.apparent_temp();
+
+    if let Some(a) = apparent_temp {
+        let style = outdoor_temp_style(a);
+        WeatherData{title:"Feels".into(), text: format!("{a:.0}F"), style}
+    } else {
+        WeatherData::none()
+    }
+    
+}
+
 
 
 
@@ -891,6 +907,77 @@ fn format_pressure(e: &StationEntry, station: &Station, db: &BTreeMap<DateTime<U
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+enum FlightRules {
+    VFR,
+    MVFR,
+    IFR,
+    LIFR
+}
+
+impl fmt::Display for FlightRules {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let string = match *self {
+            Self::VFR => "VFR",
+            Self::MVFR => "MVFR",
+            Self::IFR => "IFR",
+            Self::LIFR => "LIFR",
+        };
+        write!(f, "{}", string)
+    }
+}
+
+impl FlightRules {
+    fn style(&self) -> String {
+        match *self {
+            Self::VFR => {Style::new(&[GreenBg, Bold])},
+            Self::MVFR => {Style::new(&[BlueBg, Bold])},
+            Self::IFR => {Style::new(&[RedBg, Bold])},
+            Self::LIFR => {Style::new(&[PurpleBg, Bold])}
+        }
+    }
+}
+
+fn format_flight_rules(e: &StationEntry) -> WeatherData {
+    use CloudLayerCoverage::*;
+    use FlightRules::*;
+    
+    let mut ceiling_height = u32::MAX;
+
+    if let (Some(cover), Some(vis)) = (&e.skycover, &e.visibility) {
+        let fr: FlightRules;
+        
+        if let SkyCoverage::Cloudy(v) = cover {
+            for layer in v {
+                match layer.coverage {
+                    Scattered | Broken | Overcast => {
+                        if layer.height < ceiling_height {
+                            ceiling_height = layer.height;
+                        }
+                    }
+                    Few => {}
+                }
+            }
+        } // otherwise we have clear skys
+
+        fr = match ceiling_height {
+            0..=499 => LIFR,
+            _ if *vis < 1.0 => LIFR,
+            500..=999 => IFR,
+            _ if *vis < 3.0 => IFR,
+            1000..=2999 => MVFR,
+            _ if *vis < 5.0 => MVFR,
+            _ => VFR,
+        };
+
+        return WeatherData{title: "".into(), text: fr.to_string(), style: fr.style()};
+    
+    } else {
+        return WeatherData::none();
+    }
+
+} 
+
 
 const COLUMN_WIDTH: usize = 80;
 
@@ -904,7 +991,9 @@ fn station_line(prelude: &str, e: &StationEntry, station: &Station, indoor: bool
 
     let (dewpoint, rh) = format_dewpoint(e);
 
+    string_vec.push(format_flight_rules(e));
     string_vec.push(format_temp(e, indoor, db));
+    string_vec.push(format_apparent_temp(e));
     string_vec.push(format_pressure(e, station, db));
     string_vec.push(dewpoint);
     string_vec.push(rh);
@@ -995,7 +1084,6 @@ async fn current_conditions() {
         Err(e) => {println!("{}{}", title("CURRENT CONDITIONS"), e)},
     }
 }
-
 
 
 
@@ -1152,6 +1240,20 @@ fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<StationEntry> {
 
 }
 
+fn day_of_week_style<T: TimeZone>(dt: &DateTime<T>) -> String {
+
+    match dt.weekday() {
+        Mon => Style::new(&[Red, Bold]),
+        Tue => Style::new(&[Yellow, Bold]),
+        Wed => Style::new(&[Green, Bold]),
+        Thu => Style::new(&[Purple, Bold]),
+        Fri => Style::new(&[Blue, Bold]),
+        Sat => Style::new(&[Cyan, Bold]),
+        Sun => Style::new(&[Bold]),
+    }
+
+}
+
 async fn forecast_handler() -> Result<String, String> {
     let mut s = title("FORECAST");
 
@@ -1194,12 +1296,14 @@ async fn forecast_handler() -> Result<String, String> {
 
         let entry = entries.get(entry_idx).unwrap();
 
-        included.insert(dt, entry);    
+        included.insert(entry.date_time, entry);    
     }
 
     for (dt, entry) in included {
         let local_dt: DateTime<Local> = dt.into();
-        let prelude = format!("{}:", local_dt.format("%a %d %l%p"));
+        let day_of_week_style = day_of_week_style(&local_dt);
+
+        let prelude = format!("{day_of_week_style}{}{Reset} {}:", local_dt.format("%a"), local_dt.format("%d %l%p"));
         s.push_str(&station_line(&prelude, entry, &psm_station, false, &BTreeMap::new())?);
     }
 
