@@ -973,8 +973,11 @@ async fn current_conditions_handler() -> Result<String, String> {
     let latest_psm = psm_db.last_key_value()
         .ok_or(String::from("PSM json did not have any values"))?;
 
-    let apt_prelude = format!("{}: ⌛{}", apt_station.name, latest_apt.0.format("%I:%M %p"));
-    let psm_prelude = format!("{}: ⌛{}", psm_station.name, latest_psm.0.format("%I:%M %p"));
+    let local_time_apt: DateTime<Local> = latest_apt.0.clone().into();
+    let local_time_psm: DateTime<Local> = latest_psm.0.clone().into();
+
+    let apt_prelude = format!("{}: ⌛{}", apt_station.name, local_time_apt.format("%I:%M %p"));
+    let psm_prelude = format!("{}: ⌛{}", psm_station.name, local_time_psm.format("%I:%M %p"));
 
     let apt_line = station_line(&apt_prelude, latest_apt.1, &apt_station, true, &psm_db)?;
     let psm_line = station_line(&psm_prelude, latest_psm.1, &psm_station, false, &psm_db)?;
@@ -992,6 +995,14 @@ async fn current_conditions() {
         Err(e) => {println!("{}{}", title("CURRENT CONDITIONS"), e)},
     }
 }
+
+
+
+
+
+
+
+
 
 // FORECAST --------------------------------------------------------------------
 
@@ -1157,7 +1168,7 @@ async fn forecast_handler() -> Result<String, String> {
 
     let mut included = BTreeMap::new();
 
-    for hours_from_now in [0, 1, 2, 3, 6, 12, 18, 24, 
+    for hours_from_now in [0, 1, 2, 3, 4, 5, 6, 9, 12, 18, 
                             (24*1 + 0), (24*1 + 6), (24*1 + 12), (24*1 + 18),
                             (24*2 + 0), (24*2 + 6), (24*2 + 12), (24*2 + 18),
                             (24*3 + 0), (24*3 + 12),
