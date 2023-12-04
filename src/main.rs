@@ -1,4 +1,4 @@
-use std::{fmt, collections::{HashMap, BTreeMap}, time::Duration, fs, f32::consts::E};
+use std::{fmt, collections::{HashMap, BTreeMap}, time::Duration, fs};
 
 use chrono::{Local, Utc, NaiveDate, NaiveTime, DateTime, TimeZone, NaiveDateTime};
 use home::home_dir;
@@ -1028,10 +1028,10 @@ fn from_iso8601_no_seconds<'de, D>(des: D) -> Result<Vec<DateTime<Utc>>, D::Erro
 
 #[derive(Debug, Deserialize)]
 struct OpenMeteoResponse {
-    latitude: f64,
     hourly: OpenMeteoResponseHourly
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct OpenMeteoResponseHourly {
     #[serde(deserialize_with="from_iso8601_no_seconds")]
@@ -1119,6 +1119,8 @@ fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<StationEntry> {
         let snow = hourly.snowfall[idx];
         let unknown = hourly.precip[idx] - rain - snow;
 
+        //todo: precip in station entry structs
+        #[allow(unused_variables)]
         let precip = Some(Precip {rain, snow, unknown}); 
 
 
