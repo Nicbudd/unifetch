@@ -1033,18 +1033,6 @@ fn station_line(prelude: &str, e: &StationEntry, station: &Station, indoor: bool
 
 async fn current_conditions_handler() -> Result<String, String> {
 
-    let apt_station = Station {
-        coords: (43.00, 0.0), // im not giving that away
-        altitude: 24.,
-        name: String::from("APT"),
-    };
-
-    let psm_station = Station {
-        coords: (43.08, -70.82),
-        altitude: 30.,
-        name: String::from("KPSM"),
-    };
-
     let apt_conditions = wxer_query("local", "hourly").await?;
     let psm_conditions = wxer_query("psm", "hourly").await?;
 
@@ -1119,7 +1107,7 @@ struct OpenMeteoResponse {
     hourly: OpenMeteoResponseHourly
 }
 
-#[allow(dead_code)]
+// #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct OpenMeteoResponseHourly {
     #[serde(deserialize_with="from_iso8601_no_seconds")]
@@ -1307,7 +1295,6 @@ async fn forecast_handler() -> Result<String, String> {
         s.push_str(&station_line(&prelude, entry, &psm_station, false, &BTreeMap::new())?);
     }
 
-    
 
     Ok(s)
 }

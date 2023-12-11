@@ -1624,8 +1624,8 @@ dependencies = [
 
 [[package]]
 name = "wxer_lib"
-version = "0.4.0"
-source = "git+https://github.com/Nicbudd/wxer_lib#c4243791259c42033ebc4288a29ff5684b55b29e"
+version = "0.5.0"
+source = "git+https://github.com/Nicbudd/wxer_lib?branch=updated-wx-entry-struct#94c43da3c49044d20f47f08153da4e9a6722ad51"
 dependencies = [
  "anyhow",
  "chrono",
