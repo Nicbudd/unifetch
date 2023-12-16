@@ -370,7 +370,7 @@ impl fmt::Debug for CloudLayer {
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct StationEntryWithTime(DateTime<Utc>, StationEntry);
+struct StationEntryWithTime(DateTime<Utc>, WxEntry);
 
 
 async fn wxer_query(loc: &str, time: &str) -> Result<String, String> {
@@ -424,7 +424,7 @@ enum Trend {
 
 use Trend::*;
 
-fn db_reverse_time(db: &BTreeMap<DateTime<Utc>, StationEntry>, duration: chrono::Duration) -> Result<&StationEntry, String> {
+fn db_reverse_time(db: &BTreeMap<DateTime<Utc>, WxEntry>, duration: chrono::Duration) -> Result<&WxEntry, String> {
     let latest = db.last_key_value()
                 .ok_or(String::from("database has nothing"))?;
 
@@ -437,8 +437,8 @@ fn db_reverse_time(db: &BTreeMap<DateTime<Utc>, StationEntry>, duration: chrono:
 
 impl Trend {
 
-    fn from_db_inner<'a, F: FnMut(&'a StationEntry) -> Option<f32>>
-      (db: &'a BTreeMap<DateTime<Utc>, StationEntry>, 
+    fn from_db_inner<'a, F: FnMut(&'a WxEntry) -> Option<f32>>
+      (db: &'a BTreeMap<DateTime<Utc>, WxEntry>, 
       mut get_field: F, 
       change_criteria: (chrono::Duration, f32), 
       rapid_criteria: (chrono::Duration, f32, chrono::Duration, f32)) -> Result<Trend, ()> {
@@ -477,8 +477,8 @@ impl Trend {
 
     }
 
-    fn from_db<'a, F: FnMut(&'a StationEntry) -> Option<f32>>
-        (db: &'a BTreeMap<DateTime<Utc>, StationEntry>, get_field: F, 
+    fn from_db<'a, F: FnMut(&'a WxEntry) -> Option<f32>>
+        (db: &'a BTreeMap<DateTime<Utc>, WxEntry>, get_field: F, 
         change_criteria: (chrono::Duration, f32), 
         rapid_criteria: (chrono::Duration, f32, chrono::Duration, f32)) -> Trend {
 
@@ -616,15 +616,18 @@ fn format_wx(o: Option<Vec<String>>) -> WeatherData {
 }
 
 
-fn format_dewpoint(s: &StationEntry) -> (WeatherData, WeatherData) {
+fn format_dewpoint(e: &WxEntry) -> (WeatherData, WeatherData) {
     let dew_text: String;
     let dew_style: String;
 
-    if s.dewpoint_2m.is_none() {
+    let near_surface = e.layers.get(&Layer::NearSurface);
+    let dewpoint = near_surface.map(|x| x.dewpoint).flatten();
+
+    if dewpoint.is_none() {
         return (WeatherData::none(), WeatherData::none());
     }
 
-    let a = s.dewpoint_2m.unwrap();
+    let a = dewpoint.unwrap();
 
     dew_style = if a > 70. {
         Style::new(&[PurpleBg, Black, Bold])
@@ -642,7 +645,7 @@ fn format_dewpoint(s: &StationEntry) -> (WeatherData, WeatherData) {
 
     let rh_text: String;
     let rh_style: String;
-    let rh = s.relative_humidity_2m();
+    let rh = near_surface.map(|x| x.relative_humidity_2m()).flatten();
 
     match rh {
         Some(a) => {
@@ -672,15 +675,18 @@ fn format_dewpoint(s: &StationEntry) -> (WeatherData, WeatherData) {
 
 } 
 
-fn format_wind(s: &StationEntry) -> WeatherData {
+fn format_wind(e: &WxEntry) -> WeatherData {
     let text: String;
     let style: String;
 
-    if s.wind_10m.is_none() {
+    let near_surface = e.layers.get(&Layer::NearSurface);
+    let wind_speed = near_surface.map(|x| x.wind()).flatten();
+
+    if wind_speed.is_none() {
         return WeatherData::none();
     }
 
-    let a = s.wind_10m.unwrap();
+    let a = wind_speed.unwrap();
 
     style = if a.speed > 45. {
         Style::new(&[YellowBg, Black, Bold])
@@ -703,7 +709,7 @@ fn format_wind(s: &StationEntry) -> WeatherData {
     WeatherData {title: "Wind".into(), text, style}
 }
 
-fn format_cloud(s: &StationEntry) -> WeatherData {
+fn format_cloud(s: &WxEntry) -> WeatherData {
     let text: String;
     let style: String;
 
@@ -736,11 +742,14 @@ fn format_cloud(s: &StationEntry) -> WeatherData {
     WeatherData{title: "Clouds".into(), text, style}
 }
 
-fn format_visibility(e: &StationEntry) -> WeatherData {
+fn format_visibility(e: &WxEntry) -> WeatherData {
     let text: String;
     let style: String;
 
-    match e.visibility {
+    let near_surface = e.layers.get(&Layer::NearSurface);
+    let visibility = near_surface.map(|x| x.visibility).flatten();
+
+    match visibility {
         None => return WeatherData::none(),
         Some(v) => {
             if v <= 1. {
@@ -762,7 +771,7 @@ fn format_visibility(e: &StationEntry) -> WeatherData {
 
 }
 
-fn format_metar(e: &StationEntry) -> String {
+fn format_metar(e: &WxEntry) -> String {
     let s = e.raw_metar.clone();
     match s {
         Some(text) => { 
@@ -828,28 +837,28 @@ fn outdoor_temp_style(temp: f32) -> String {
     }
 }
 
-fn format_temp(e: &StationEntry, indoor: bool, db: &BTreeMap<DateTime<Utc>, StationEntry>) -> WeatherData {
+fn format_temp(e: &WxEntry, indoor: bool, db: &BTreeMap<DateTime<Utc>, WxEntry>) -> WeatherData {
     
     let temp = if indoor {
-        e.indoor_temperature
+        e.layers.get(&Layer::Indoor).map(|x| x.temperature)
     } else {
-        e.temperature_2m
+        e.layers.get(&Layer::NearSurface).map(|x| x.temperature)
     };
 
 
     let temp_change = if indoor {
         Trend::from_db(&db, 
-            |data| {data.indoor_temperature}, 
+            |data| {data.layers.get(&Layer::Indoor).map(|x| x.temperature).flatten()}, 
                     (chrono::Duration::hours(2), 2.),
                     (chrono::Duration::hours(1), 2., chrono::Duration::hours(1), 2.))
     } else {
         Trend::from_db(&db, 
-            |data| {data.temperature_2m}, 
+            |data| {data.layers.get(&Layer::NearSurface).map(|x| x.temperature).flatten()}, 
             (chrono::Duration::hours(2), 4.),
             (chrono::Duration::minutes(15), 2., chrono::Duration::hours(1), 4.))
     };
     
-    if let Some(temp) = temp {
+    if let Some(temp) = temp.flatten() {
 
         let style = if indoor {
             indoor_temp_style(temp)
@@ -863,8 +872,10 @@ fn format_temp(e: &StationEntry, indoor: bool, db: &BTreeMap<DateTime<Utc>, Stat
     }
 }
 
-fn format_apparent_temp(e: &StationEntry) -> WeatherData {
-    let apparent_temp = e.apparent_temp();
+fn format_apparent_temp(e: &WxEntry) -> WeatherData {
+    let apparent_temp = e.layers.get(&Layer::NearSurface)
+                                        .map(|x| x.apparent_temp())
+                                        .flatten();
 
     if let Some(a) = apparent_temp {
         let style = outdoor_temp_style(a);
@@ -872,7 +883,6 @@ fn format_apparent_temp(e: &StationEntry) -> WeatherData {
     } else {
         WeatherData::none()
     }
-    
 }
 
 
@@ -892,11 +902,17 @@ fn mslp_style(pres: f32) -> String {
     }
 }
 
-fn format_pressure(e: &StationEntry, station: &Station, db: &BTreeMap<DateTime<Utc>, StationEntry>) -> WeatherData {
-    if let Some(pressure) = e.slp(&station) {
+fn format_pressure(e: &WxEntry, station: &Station, db: &BTreeMap<DateTime<Utc>, WxEntry>) -> WeatherData {
+    
+    dbg!(&e);
+
+    let slp = e.best_slp();
+    dbg!(slp);
+    
+    if let Some(pressure) = slp {
         let style = mslp_style(pressure);
         let pres_change = Trend::from_db(&db, 
-            |data| {data.slp(&station)}, 
+            |data| {data.best_slp()}, 
             (chrono::Duration::hours(6), 3.),
             (chrono::Duration::minutes(15), 1., chrono::Duration::hours(3), 2.));
         
@@ -938,13 +954,16 @@ impl FlightRules {
     }
 }
 
-fn format_flight_rules(e: &StationEntry) -> WeatherData {
+fn format_flight_rules(e: &WxEntry) -> WeatherData {
     use CloudLayerCoverage::*;
     use FlightRules::*;
     
     let mut ceiling_height = u32::MAX;
 
-    if let (Some(cover), Some(vis)) = (&e.skycover, &e.visibility) {
+    let near_surface = e.layers.get(&Layer::Indoor);
+    let visibility = near_surface.map(|x| x.visibility).flatten();
+
+    if let (Some(cover), Some(vis)) = (&e.skycover, visibility) {
         let fr: FlightRules;
         
         if let SkyCoverage::Cloudy(v) = cover {
@@ -962,11 +981,11 @@ fn format_flight_rules(e: &StationEntry) -> WeatherData {
 
         fr = match ceiling_height {
             0..=499 => LIFR,
-            _ if *vis < 1.0 => LIFR,
+            _ if vis < 1.0 => LIFR,
             500..=999 => IFR,
-            _ if *vis < 3.0 => IFR,
+            _ if vis < 3.0 => IFR,
             1000..=2999 => MVFR,
-            _ if *vis < 5.0 => MVFR,
+            _ if vis < 5.0 => MVFR,
             _ => VFR,
         };
 
@@ -982,8 +1001,8 @@ fn format_flight_rules(e: &StationEntry) -> WeatherData {
 const COLUMN_WIDTH: usize = 80;
 
 
-fn station_line(prelude: &str, e: &StationEntry, station: &Station, indoor: bool,
-  db: &BTreeMap<DateTime<Utc>, StationEntry>) -> Result<String, String> {
+fn station_line(prelude: &str, e: &WxEntry, station: &Station, indoor: bool,
+  db: &BTreeMap<DateTime<Utc>, WxEntry>) -> Result<String, String> {
 
     let mut string_vec: Vec<WeatherData> = vec![];
 
@@ -1033,14 +1052,27 @@ fn station_line(prelude: &str, e: &StationEntry, station: &Station, indoor: bool
 
 async fn current_conditions_handler() -> Result<String, String> {
 
+    let psm_station: Station = Station {
+        coords: (43.08, -70.82),
+        altitude: 30.,
+        name: String::from("KPSM"),
+    };  
+
+    let apt_station: Station = Station {
+        coords: (43.00, 0.0), // im not giving that away
+        altitude: 24.,
+        name: String::from("APT"),
+    }; 
+
+
     let apt_conditions = wxer_query("local", "hourly").await?;
     let psm_conditions = wxer_query("psm", "hourly").await?;
 
     // dbg!(&local_conditions);
     // dbg!(&psm_conditions);
 
-    let apt_db: BTreeMap<DateTime<Utc>, StationEntry> = serde_json::from_str(&apt_conditions).map_err(|e| e.to_string())?;
-    let psm_db: BTreeMap<DateTime<Utc>, StationEntry> = serde_json::from_str(&psm_conditions).map_err(|e| e.to_string())?;
+    let apt_db: BTreeMap<DateTime<Utc>, WxEntry> = serde_json::from_str(&apt_conditions).map_err(|e| e.to_string())?;
+    let psm_db: BTreeMap<DateTime<Utc>, WxEntry> = serde_json::from_str(&psm_conditions).map_err(|e| e.to_string())?;
 
     let mut s = title("CURRENT CONDITIONS");
 
@@ -1056,7 +1088,7 @@ async fn current_conditions_handler() -> Result<String, String> {
     let apt_prelude = format!("{}: ⌛{}", apt_station.name, local_time_apt.format("%I:%M %p"));
     let psm_prelude = format!("{}: ⌛{}", psm_station.name, local_time_psm.format("%I:%M %p"));
 
-    let apt_line = station_line(&apt_prelude, latest_apt.1, &apt_station, true, &psm_db)?;
+    let apt_line = station_line(&apt_prelude, latest_apt.1, &apt_station, true, &apt_db)?;
     let psm_line = station_line(&psm_prelude, latest_psm.1, &psm_station, false, &psm_db)?;
 
     s.push_str(&apt_line);
@@ -1169,9 +1201,15 @@ async fn get_open_meteo(s: &Station) -> Result<OpenMeteoResponse, String> {
     serde_json::from_str(&t).map_err(|e| e.to_string())
 }
 
-fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<StationEntry> {
+fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<WxEntry> {
 
-    let mut entries: Vec<StationEntry> = vec![];
+    let psm_station: Station = Station {
+        coords: (43.08, -70.82),
+        altitude: 30.,
+        name: String::from("KPSM"),
+    };  
+
+    let mut entries: Vec<WxEntry> = vec![];
 
     let hourly = open_meteo.hourly;
 
@@ -1181,15 +1219,8 @@ fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<StationEntry> {
         let sea_level_pressure = Some(hourly.sea_level_pressure[idx]);
         let visibility = Some(hourly.visibility[idx] / 5280.);
 
-        let wind_10m;
-
-        let wind_dir_result = Direction::from_degrees(hourly.wind_dir_10m[idx]);
-        if wind_dir_result.is_err() {
-            wind_10m = None;
-        } else {
-            let wind_dir = wind_dir_result.unwrap();
-            wind_10m = Some(Wind {direction: wind_dir, speed: hourly.wind_speed_10m[idx]});
-        }
+        let wind_direction = Direction::from_degrees(hourly.wind_dir_10m[idx]).ok();
+        let wind_speed = Some(hourly.wind_speed_10m[idx]);
 
         let rain = hourly.rain[idx];
         let snow = hourly.snowfall[idx];
@@ -1205,20 +1236,41 @@ fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<StationEntry> {
         if snow > 0. {weather.push("SN".into())};
         let present_wx = Some(weather);
 
+        let mut layers = HashMap::new();
 
-        let e = StationEntry { 
-            date_time: date_time.clone(), 
-            indoor_temperature: None, 
-            temperature_2m, 
-            dewpoint_2m, 
-            sea_level_pressure, 
-            wind_10m, 
-            skycover: None, 
-            visibility, 
-            precip_today: None, 
-            present_wx, 
-            raw_metar: None, 
-            raw_pressure: None 
+        let near_surface = WxEntryLayer {
+            layer: Layer::NearSurface,
+            height_agl: Some(2.0),
+            height_msl: Some(psm_station.altitude),
+            temperature: temperature_2m,
+            dewpoint: dewpoint_2m,
+            pressure: None,
+            wind_direction,
+            wind_speed,
+            visibility,
+        };
+
+        let mut sea_level = WxEntryLayer::empty(Layer::SeaLevel);
+
+        sea_level.pressure = sea_level_pressure;
+
+        layers.insert(Layer::NearSurface, near_surface);
+        layers.insert(Layer::SeaLevel, sea_level);
+
+
+        let e = WxEntry {
+            date_time: date_time.clone(),
+            station: psm_station.clone(),
+
+            layers,
+
+            cape: Some(hourly.cape[idx]),
+            skycover: None,
+            present_wx,
+            raw_metar: None,
+            precip,
+            precip_probability: Some(hourly.precip_probability[idx]),
+            precip_today: None,
         };
 
         entries.push(e);
