@@ -55,7 +55,7 @@ async fn main() {
             // tides();
             
             
-            // teleconnections();
+            wx::tele::teleconnections(),
     
             earthquake::earthquakes()
     

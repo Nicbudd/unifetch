@@ -1,5 +1,6 @@
 pub mod forecast;
 pub mod conditions;
+pub mod tele;
 
 use crate::common;
 use common::TermStyle::*;
