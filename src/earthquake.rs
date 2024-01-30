@@ -99,7 +99,7 @@ impl Earthquake {
             latitude: usgs.geometry.coordinates.1,
             longitude: usgs.geometry.coordinates.0,
             depth: usgs.geometry.coordinates.2,
-            dist: distance_between_coords(usgs.geometry.coordinates.1, usgs.geometry.coordinates.0, lat, long),
+            dist: distance_between_coords_miles(usgs.geometry.coordinates.1, usgs.geometry.coordinates.0, lat, long),
             id: usgs.id,
         })
     }
@@ -224,9 +224,7 @@ fn tallest_skyscrapers(v: &Vec<Earthquake>) -> Vec<&Earthquake> {
     result_vec
 }
 
-fn distance_between_coords(lat1: f32, long1: f32, lat2: f32, long2: f32) -> f32 {
-
-    // dbg!(lat1, lat2, long1, long2);
+fn distance_between_coords_miles(lat1: f32, long1: f32, lat2: f32, long2: f32) -> f32 {
 
     // Haversine formula
     let earth_radius = 3956.5; // miles, approx

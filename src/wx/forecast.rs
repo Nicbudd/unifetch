@@ -51,8 +51,8 @@ struct OpenMeteoResponseHourly {
     temperature_2m: Vec<f32>,
     #[serde(rename="dew_point_2m")]
     dewpoint_2m: Vec<f32>,
-    #[serde(rename="apparent_temperature")]
-    feels_like: Vec<f32>,
+    // #[serde(rename="apparent_temperature")]
+    // feels_like: Vec<f32>,
     #[serde(rename="precipitation_probability")]
     precip_probability: Vec<f32>,
     #[serde(rename="precipitation")]
@@ -199,6 +199,8 @@ fn day_of_week_style<T: TimeZone>(dt: &DateTime<T>) -> String {
 
 async fn forecast_handler() -> Result<String, String> {
     let mut s = common::title("FORECAST");
+
+    s.push_str("Weather data by Open-Meteo.com (https://open-meteo.com/)\n\n");
 
     let psm_station = Station {
         coords: (43.08, -70.82),
