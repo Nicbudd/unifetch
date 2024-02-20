@@ -311,8 +311,12 @@ async fn earthquake_handler() -> Result<String, String> {
     Ok(s)
 }
 
+use super::Args;
+pub async fn earthquakes(args: &Args) {
+    if !args.earthquakes {
+        return;
+    }
 
-pub async fn earthquakes() {
     match earthquake_handler().await {
         Ok(s) => {println!("{}", s)},
         Err(e) => {println!("{}{}", common::title("EARTHQUAKE"), e)},

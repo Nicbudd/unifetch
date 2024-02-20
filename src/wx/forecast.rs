@@ -256,7 +256,12 @@ async fn forecast_handler() -> Result<String, String> {
     Ok(s)
 }
 
-pub async fn forecast() {
+use super::Args;
+pub async fn forecast(args: &Args) {
+    if !args.forecast {
+        return;
+    }
+
     match forecast_handler().await {
         Ok(s) => {println!("{}", s)},
         Err(e) => {println!("{}{}", common::title("FORECAST"), e)},
