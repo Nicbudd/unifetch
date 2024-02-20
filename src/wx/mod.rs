@@ -535,6 +535,55 @@ fn format_pressure(e: &WxEntry, db: &BTreeMap<DateTime<Utc>, WxEntry>) -> Weathe
     }
 }
 
+fn style_500mb_height(h: f32) -> String {
+    if h > 570.0 {
+        Style::new(&[YellowBg, Black, Bold])
+    } else if h > 585.0 {
+        Style::new(&[RedBg, Bold])
+    } else if h < 530.0 {
+        Style::new(&[BlueBg, Black, Bold])
+    } else if h < 515.0 {
+        Style::new(&[PurpleBg, Bold])
+    } else {
+        Style::new(&[Bold])
+    }
+}
+
+fn format_500mb_height(e: &WxEntry) -> WeatherData {
+    if let Some(l) = e.layers.get(&Layer::MBAR(500)) {
+        if let Some(h) = l.height_msl {
+            let dam = h / 10.; // get height in decameters
+            return WeatherData{title: "500mb Hght".into(), text: format!("{:.0}", dam), style: style_500mb_height(dam)}
+        }
+    }
+
+    return WeatherData::none();
+}
+
+fn style_250mb_wind(a: f32) -> String {
+    if a > 140. {
+        Style::new(&[YellowBg, Black, Bold])
+    } else if a > 110. {
+        Style::new(&[RedBg, Black, Bold])
+    } else if a > 80. {
+        Style::new(&[PurpleBg, Black, Bold])
+    } else if a > 60. {
+        Style::new(&[BlueBg, Black, Bold])
+    } else {
+        Style::new(&[Bold])
+    }
+}
+
+fn format_250mb_wind(e: &WxEntry) -> WeatherData {
+    if let Some(l) = e.layers.get(&Layer::MBAR(250)) {
+        if let Some(wind) = l.wind_speed {
+            return WeatherData{title: "250mb".into(), text: format!("{:2.0}kts", wind), style: style_250mb_wind(wind)}
+        }
+    }
+
+    return WeatherData::none();
+}
+
 
 #[derive(Copy, Clone, Debug)]
 enum FlightRules {
@@ -637,7 +686,9 @@ pub fn station_line(prelude: &str, e: &WxEntry, indoor: bool,
       string_vec.push(format_visibility(e));
       string_vec.push(format_wx(e.present_wx.clone()));
       string_vec.push(format_wind(e));
+      string_vec.push(format_250mb_wind(e));
       string_vec.push(format_cloud(e));
+      string_vec.push(format_500mb_height(e));
   
       total_string.push_str(prelude);
   
