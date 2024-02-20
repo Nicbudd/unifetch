@@ -123,7 +123,7 @@ fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<WxEntry> {
         let visibility = Some(hourly.visibility[idx] / 5280.);
 
         let wind_direction = Direction::from_degrees(hourly.wind_dir_10m[idx]).ok();
-        let wind_speed = Some(hourly.wind_speed_10m[idx]);
+        let wind_speed = Some(hourly.wind_speed_10m[idx] * 0.868976);
 
         let rain = hourly.rain[idx];
         let snow = hourly.snowfall[idx];
@@ -154,11 +154,18 @@ fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<WxEntry> {
         };
 
         let mut sea_level = WxEntryLayer::empty(Layer::SeaLevel);
-
         sea_level.pressure = sea_level_pressure;
+
+        let mut layer_250mb = WxEntryLayer::empty(Layer::MBAR(250));
+        layer_250mb.wind_speed = Some(hourly.wind_speed_250mb[idx] * 0.868976);
+
+        let mut layer_500mb = WxEntryLayer::empty(Layer::MBAR(500));
+        layer_500mb.height_msl = Some(hourly.height_500mb[idx] * 0.3048); // convert from feet to meters
 
         layers.insert(Layer::NearSurface, near_surface);
         layers.insert(Layer::SeaLevel, sea_level);
+        layers.insert(Layer::MBAR(500), layer_500mb);
+        layers.insert(Layer::MBAR(250), layer_250mb);
 
 
         let e = WxEntry {
@@ -212,7 +219,6 @@ async fn forecast_handler() -> Result<String, String> {
 
     let r = get_open_meteo(&psm_station).await?;
     let entries = open_meteo_to_entries(r);
-
 
 
     let mut included = BTreeMap::new();
