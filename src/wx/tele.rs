@@ -1,8 +1,11 @@
-use std::num::ParseFloatError;
-
 use crate::wx::*;
 
-pub async fn teleconnections(){
+use super::Args;
+pub async fn teleconnections(args: &Args){
+    if !args.teleconnections {
+        return;
+    }
+
     match teleconnections_handler().await {
         Ok(s) => {println!("{}", s)},
         Err(e) => {println!("{}{}", common::title("TELECONNECTIONS"), e)},
@@ -38,8 +41,9 @@ async fn get_enso() -> Result<Vec<f32>, String> {
 
         let months = split
             .map(|x| x.parse::<f32>())
-            .collect::<Result<Vec<f32>, ParseFloatError>>()
-            .map_err(|x| x.to_string())?;
+            .flatten()
+            .filter(|x| *x < 20.0 && *x > -20.0)
+            .collect::<Vec<f32>>();
 
         all_months.extend_from_slice(&months);
 

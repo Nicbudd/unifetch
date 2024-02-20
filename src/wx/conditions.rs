@@ -284,7 +284,13 @@ async fn current_conditions_handler() -> Result<String, String> {
 
 }
 
-pub async fn current_conditions() {
+use super::Args;
+pub async fn current_conditions(args: &Args) {
+
+    if !args.current_conditions {
+        return;
+    }
+
     match current_conditions_handler().await {
         Ok(s) => {println!("{}", s)},
         Err(e) => {println!("{}{}", common::title("CURRENT CONDITIONS"), e)},

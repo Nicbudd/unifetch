@@ -62,8 +62,13 @@ fn generate_solar_lunar_string(json: serde_json::Value) -> Result<String, String
     ))
 }    // dbg!(&r);
 
+use super::Args;
+pub async fn solar_lunar(args: &Args) {
 
-pub async fn solar_lunar() {
+    if !args.solar_lunar {
+        return;
+    }
+
     let mut s: String = common::title("SOLAR & LUNAR");
 
     let now = Local::now();
