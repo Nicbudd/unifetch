@@ -76,7 +76,6 @@ async fn main() {
             args.random = true;
             args.solar_lunar = true;
             args.current_conditions = true;
-            args.forecast = true;
             args.teleconnections = true;
             args.earthquakes = true;
     } 
