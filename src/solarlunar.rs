@@ -20,9 +20,14 @@ fn parse_navy_times(v: &Value) -> Result<NaiveTime, String> {
 fn string_from_rise_set_times(name: &str, start_name: &str, end_name: &str, start: NaiveTime, end: NaiveTime) -> String {
     let s = start.format("%I:%M %p");
     let e = end.format("%I:%M %p");
-    let d = end - start;
+
+    if end < start {
+        format!("{name:<8} {start_name:<5} {Bold}{s}{Reset} | {end_name} {Bold}{e}{Reset}")
+    } else {
+        let d = end - start;
+        format!("{name:<8} {start_name:<5} {Bold}{s}{Reset} | {end_name} {Bold}{e}{Reset} | Duration {Bold}{}h{}m{Reset}\n", d.num_hours(), d.num_minutes() % 60)
+    }
     
-    format!("{name:<8} {start_name:<5} {Bold}{s}{Reset} | {end_name} {Bold}{e}{Reset} | Duration {Bold}{}h{}m{Reset}\n", d.num_hours(), d.num_minutes() % 60)
 }
 
 fn generate_solar_lunar_string(json: serde_json::Value) -> Result<String, String> {
@@ -36,8 +41,20 @@ fn generate_solar_lunar_string(json: serde_json::Value) -> Result<String, String
     let sunset = parse_navy_times(&sundata[3]["time"])?;
     let twilight_end = parse_navy_times(&sundata[4]["time"])?;
 
-    let moonrise = parse_navy_times(&moondata[0]["time"])?;
-    let moonset = parse_navy_times(&moondata[2]["time"])?;   
+    let moonset ;   
+    let moonrise;
+
+    if moondata[0]["phen"] == "set" && moondata[1]["phen"] == "rise" {
+        moonset = parse_navy_times(&moondata[0]["time"])?;
+        moonrise = parse_navy_times(&moondata[1]["time"])?;
+    } else if moondata[0]["phen"] == "rise" && moondata[1]["phen"] == "set" {
+        moonrise = parse_navy_times(&moondata[0]["time"])?;
+        moonset = parse_navy_times(&moondata[1]["time"])?;
+    } else {
+        moonrise = NaiveTime::default(); // I have to do this, but this is stupid.
+        moonset = NaiveTime::default();
+        Err(String::from("Unexpected values for moon data"))?;
+    }
 
     let moon_phase = &data["curphase"].as_str().ok_or("Could not parse JSON properly")?;
     let fracillum = &data["fracillum"].as_str().ok_or("Could not parse JSON properly")?;
@@ -93,6 +110,7 @@ pub async fn solar_lunar(args: &Args) {
     let form = r.send()
                 .await;
 
+    // dbg!(&form);
 
     match common::parse_request_loose_json(form).await {
         Ok(json) => {

@@ -1,8 +1,9 @@
 mod common;
-mod astrological;
+mod solarlunar;
 mod earthquake;
 mod random;
 mod wx; 
+mod updates; 
 
 use std::env;
 
@@ -25,10 +26,6 @@ fn header() {
 
 #[derive(Parser, Debug)]
 pub struct Args {
-    /// Disables header.
-    #[arg(short = 'H', long)]
-    disable_header: bool,
-
     /// Reimplements all default values, equivalent to -rsweq. If no other flags are selected this is enabled by default.
     #[arg(short, long)]
     default: bool,
@@ -56,6 +53,14 @@ pub struct Args {
     /// Latest earthquakes in "tallest skyscrapers" chronological order, and earthquakes that occured nearby (async).
     #[arg(short = 'q', long = "quakes")]
     earthquakes: bool,
+
+    /// Disables header
+    #[arg(short = 'H', long)]
+    disable_header: bool,
+
+    /// Disables the update notification section. Update checking is asynchronous
+    #[arg(short = 'u', long)]
+    disable_update_notif: bool,
 }
 
 
@@ -64,8 +69,6 @@ async fn main() {
 
     // parse args
     let mut args = Args::parse();
-
-    let cli_args: Vec<_> = std::env::args().collect();
 
     // dbg!(&cli_args);
 
@@ -93,9 +96,13 @@ async fn main() {
     }
 
     tokio::join!(
-        astrological::solar_lunar(&args), 
+        updates::updates(&args),
+
+        solarlunar::solar_lunar(&args), 
+
         wx::conditions::current_conditions(&args),
         wx::forecast::forecast(&args),
+        wx::tele::teleconnections(&args),
 
         // time_and_date();
 
@@ -107,9 +114,6 @@ async fn main() {
         //https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=8419870&product=predictions&datum=STND&time_zone=gmt&interval=hilo&units=english&format=json
         // tides();
         
-        
-        wx::tele::teleconnections(&args),
-
         earthquake::earthquakes(&args)
 
     );
