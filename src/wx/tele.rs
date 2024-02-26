@@ -1,3 +1,7 @@
+use chrono::NaiveDate;
+use csv;
+use serde::Deserialize;
+
 use crate::wx::*;
 
 use super::Args;
@@ -12,7 +16,7 @@ pub async fn teleconnections(args: &Args){
     }
 }
 
-async fn get_enso() -> Result<Vec<f32>, String> {
+async fn get_enso() -> Result<(Vec<f32>, String), String> {
     let url = "https://psl.noaa.gov/enso/mei/data/meiv2.data";
 
     let data = reqwest::get(url)
@@ -26,6 +30,8 @@ async fn get_enso() -> Result<Vec<f32>, String> {
     //                                     .from_reader(data.as_bytes());
 
     let mut all_months = vec![];
+
+    let mut month_name = "None";
 
     for line in data.lines() {
         let mut split = line.split_ascii_whitespace();
@@ -47,23 +53,46 @@ async fn get_enso() -> Result<Vec<f32>, String> {
 
         all_months.extend_from_slice(&months);
 
+        let month = months.len();
+
+        match month {
+            0 => {},
+            1 => month_name = "Dec-Jan",
+            2 => month_name = "Jan-Feb",
+            3 => month_name = "Feb-Mar",
+            4 => month_name = "Mar-Apr",
+            5 => month_name = "Apr-May",
+            6 => month_name = "May-Jun",
+            7 => month_name = "Jun-Jul",
+            8 => month_name = "Jul-Aug",
+            9 => month_name = "Aug-Sep",
+            10 => month_name = "Sep-Oct",
+            11 => month_name = "Oct-Nov",
+            12 => month_name = "Nov-Dec",
+            _ => Err("Unexpected length for ENSO count".to_string())?,
+        };
+
     }
 
-    Ok(all_months)
+    Ok((all_months, month_name.to_string()))
 
 }
 
 fn format_enso_num(m: f32) -> String {
     let color = if m >= 1.0 {Style::new(&[RedBg, Black])}
-        else if m >= 0.5 {Style::new(&[Red])}
-        else if m <= -1.0 {Style::new(&[BlueBg, Black])}
-        else if m <= -0.5 {Style::new(&[Blue])}
-        else {Style::new(&[White])};
+        else if m >= 0.5 {Style::new(&[Red, Bold])}
+        else if m <= -1.0 {Style::new(&[BlueBg, Black, Bold])}
+        else if m <= -0.5 {Style::new(&[Blue, Bold])}
+        else {Style::new(&[Bold])};
 
     format!("{color}{m:.1}{Reset}")
 }
 
-fn format_enso(mut months: Vec<f32>) -> Result<String, String> {
+fn format_enso(enso: (Vec<f32>, String)) -> Result<String, String> {
+
+    let mut months = enso.0;
+    let month_name = enso.1;
+
     months.reverse();
 
     let m = months.get(0).ok_or("Not enough items found in ENSO database")?;
@@ -74,22 +103,89 @@ fn format_enso(mut months: Vec<f32>) -> Result<String, String> {
     let three_month_change = m - m3;
 
     let trend = if three_month_change >= 0.3 {" ↗"}
-        else if three_month_change <= 0.3 {" ↘"}
+        else if three_month_change <= -0.3 {" ↘"}
         else {""};
 
-    Ok(format!("ENSO: {}{trend} (6 months ago: {})", format_enso_num(*m), format_enso_num(*m6)))
+    Ok(format!("ENSO ({}): {}{trend} (6 months ago: {})\n", month_name, format_enso_num(*m), format_enso_num(*m6)))
 
+}
+
+// NAO
+#[derive(Deserialize)]
+struct NaoRecord {
+    lead: u32,
+    time: NaiveDate,
+    nao_index: f32,
+    valid_time: NaiveDate,
+} 
+
+async fn get_nao() -> Result<BTreeMap<NaiveDate, f32>, String>{    
+    let url = "https://ftp.cpc.ncep.noaa.gov/cwlinks/norm.daily.nao.gfs.z500.120days.csv";
+    // this thing is overkill
+    let data = reqwest::get(url).await.map_err(|e| e.to_string())?;
+    // let bytes = data.bytes().await.map_err(|e| e.to_string())?;
+
+    let text = data.text().await.map_err(|e| e.to_string())?;
+    
+    let mut map = BTreeMap::new();
+
+    let mut reader = csv::Reader::from_reader(text.as_bytes());
+
+    for result in reader.records() {
+        let r: NaoRecord = result
+            .map_err(|x| x.to_string())?
+            .deserialize(None)
+            .map_err(|x| x.to_string())?;
+        
+        if r.lead == 0 {
+            map.insert(r.valid_time, r.nao_index);
+        } else { // higher lead values occur after this so we wait
+            break;
+        }
+
+    }
+
+    Ok(map)
+}
+
+fn style_nao(nao: f32) -> String {
+    if nao > 2.0 {
+        Style::new(&[RedBg, Black, Bold])
+    } else if nao > 1.0 {
+        Style::new(&[Red, Bold])
+    } else if nao < -2.0 {
+        Style::new(&[BlueBg, Black, Bold])
+    } else if nao < -1.0 {
+        Style::new(&[Blue, Bold])
+    } else {
+        Style::new(&[Bold])
+    }
+}
+
+fn format_nao(nao: BTreeMap<NaiveDate, f32>) -> Result<String, String>{    
+    let current = nao.iter().nth_back(0).ok_or("No values in NAO data")?;
+    let three_days_ago = nao.iter().nth_back(3).ok_or("No values in NAO data")?;
+    let seven_days_ago = nao.iter().nth_back(7).ok_or("No values in NAO data")?;
+
+    let three_days_change = current.1 - three_days_ago.1;
+
+    let trend = if three_days_change >= 0.6 {" ↗"}
+        else if three_days_change <= -0.6 {" ↘"}
+        else {""};
+
+    Ok(format!("NAO: {}{:.2}{Reset}{trend} (7 days ago: {}{:.2}{Reset})\n", style_nao(*current.1), *current.1, style_nao(*seven_days_ago.1), *seven_days_ago.1))
 }
 
 async fn teleconnections_handler() -> Result<String, String>  {
     let mut s = common::title("TELECONNECTIONS");
     
-    let enso: Vec<f32> = get_enso().await?;
+    let enso = get_enso().await?;
+    let nao: BTreeMap<NaiveDate, f32> = get_nao().await?;
 
-    let formatted = format_enso(enso)?;
+    // dbg!(&nao);
 
-    s.push_str(&formatted);
-    s.push('\n');
+    s.push_str(&format_enso(enso)?);
+    s.push_str(&format_nao(nao)?);
 
     Ok(s)
 
