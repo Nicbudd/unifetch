@@ -32,7 +32,7 @@ fn version_greater(current: &str, origin: &str) -> Result<bool> {
 }
 
 async fn latest_version() -> Result<String> {
-    let client = Client::builder()
+    let client = Client::builder() 
                         .timeout(Duration::from_secs(3))
                         .build()?;
 

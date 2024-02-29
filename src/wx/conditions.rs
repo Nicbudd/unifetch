@@ -104,7 +104,7 @@ impl UNHWxEntry {
             dewpoint: Some(rh_to_dewpoint(self.temperature_2m, self.relative_humidity)), 
             pressure: None, 
             wind_direction: Direction::from_degrees(self.wind_dir as u16).ok(), 
-            wind_speed: Some(self.wind_speed), 
+            wind_speed: Some(self.wind_speed * 0.868976), 
             visibility: None 
         });
     
