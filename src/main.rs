@@ -110,8 +110,8 @@ async fn main() {
         // climatology();
         // stock_market();
 
-        // on hold, seavey island API doesn't work
-        //https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=8419870&product=predictions&datum=STND&time_zone=gmt&interval=hilo&units=english&format=json
+        // this works
+        // https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&begin_date=20240302&end_date=20240303&datum=MLLW&station=8421897&time_zone=lst_ldt&units=english&interval=hilo&format=json
         // tides();
         
         earthquake::earthquakes(&args)
