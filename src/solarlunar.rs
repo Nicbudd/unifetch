@@ -41,21 +41,30 @@ fn generate_solar_lunar_string(json: serde_json::Value) -> Result<String, String
     let sunset = parse_navy_times(&sundata[3]["time"])?;
     let twilight_end = parse_navy_times(&sundata[4]["time"])?;
 
-    let moonset ;   
-    let moonrise;
+    let mut moonset = None ;   
+    let mut moonrise = None;
 
-    if moondata[0]["phen"] == "set" && moondata[1]["phen"] == "rise" {
-        moonset = parse_navy_times(&moondata[0]["time"])?;
-        moonrise = parse_navy_times(&moondata[1]["time"])?;
-    } else if moondata[0]["phen"] == "rise" && moondata[1]["phen"] == "set" {
-        moonrise = parse_navy_times(&moondata[0]["time"])?;
-        moonset = parse_navy_times(&moondata[1]["time"])?;
-    } else {
-        moonrise = NaiveTime::default(); // I have to do this, but this is stupid.
-        moonset = NaiveTime::default();
+    dbg!(&moondata);
+
+    for i in 0..5 {
+        let entry = moondata.get(i);
+
+        if let Some(entry) = entry {
+            if entry["phen"] == "Set" {
+                moonset = Some(parse_navy_times(&entry["time"])?);
+            } else if entry["phen"] == "Rise" {
+                moonrise = Some(parse_navy_times(&entry["time"])?);
+            }
+        }
+    }
+
+    if moonset.is_none() || moonrise.is_none() {
         Err(String::from("Unexpected values for moon data"))?;
     }
 
+    let moonset = moonset.unwrap();
+    let moonrise = moonrise.unwrap();
+    
     let moon_phase = &data["curphase"].as_str().ok_or("Could not parse JSON properly")?;
     let fracillum = &data["fracillum"].as_str().ok_or("Could not parse JSON properly")?;
 

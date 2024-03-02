@@ -4,6 +4,7 @@ mod earthquake;
 mod random;
 mod wx; 
 mod updates; 
+// mod tides;
 
 use std::env;
 
@@ -54,6 +55,10 @@ pub struct Args {
     #[arg(short = 'q', long = "quakes")]
     earthquakes: bool,
 
+    // /// Tidal predictions from around the area (async).
+    // #[arg(short = 't')]
+    // tides: bool,
+
     /// Disables header
     #[arg(short = 'H', long)]
     disable_header: bool,
@@ -81,6 +86,7 @@ async fn main() {
             args.current_conditions = true;
             args.teleconnections = true;
             args.earthquakes = true;
+            // args.tides = true;
     } 
 
 
@@ -112,7 +118,7 @@ async fn main() {
 
         // this works
         // https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&begin_date=20240302&end_date=20240303&datum=MLLW&station=8421897&time_zone=lst_ldt&units=english&interval=hilo&format=json
-        // tides();
+        // tides::tides(&args),
         
         earthquake::earthquakes(&args)
 
