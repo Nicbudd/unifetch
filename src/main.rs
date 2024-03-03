@@ -112,6 +112,8 @@ async fn main() {
 
         // time_and_date();
 
+        // Scrape GasBuddy
+        // gas_prices();
         // forecast_analysis();
         // climatology();
         // stock_market();
