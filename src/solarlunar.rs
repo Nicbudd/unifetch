@@ -44,7 +44,7 @@ fn generate_solar_lunar_string(json: serde_json::Value) -> Result<String, String
     let mut moonset = None ;   
     let mut moonrise = None;
 
-    dbg!(&moondata);
+    // dbg!(&moondata);
 
     for i in 0..5 {
         let entry = moondata.get(i);
