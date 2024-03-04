@@ -58,8 +58,9 @@ struct TideHighLow {
 impl Display for TideHighLow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let highlowstyle = high_low_style(self.peak);
-        let time = self.t.naive_local().format("%I:%M %p %a");
-        write!(f, "{highlowstyle}{} {:.1}ft{Reset} {}", self.peak, self.v, time)
+        let time: DateTime<Local> = DateTime::from(self.t);
+        let time_str = time.format("%I:%M %p %a");
+        write!(f, "{highlowstyle}{} {:.1}ft{Reset} {}", self.peak, self.v, time_str)
     }
 }
 
@@ -74,23 +75,25 @@ fn high_low_style(peak: char) -> String {
 async fn do_tide_station(station: &TidalStation) -> Result<String, String> {
 
     let station_id = station.id;
-    let today = Local::now().format("%Y%m%d");
-    let tomorrow = (Local::now() + Duration::days(1)).format("%Y%m%d");
+    let now = Utc::now();
+    let yesterday = (now - Duration::days(1)).format("%Y%m%d");
+    let tomorrow = (now + Duration::days(1)).format("%Y%m%d");
 
-    let url = format!("https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&begin_date={today}&end_date={tomorrow}&datum=MLLW&station={station_id}&time_zone=lst_ldt&units=english&interval=hilo&format=json"); 
+    let url = format!("https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&begin_date={yesterday}&end_date={tomorrow}&datum=MLLW&station={station_id}&time_zone=gmt&units=english&interval=hilo&format=json"); 
+
+    dbg!(&url);
 
     let req = reqwest::get(url).await.map_err(|x| x.to_string())?;
     let text = req.text().await.map_err(|x| x.to_string())?;
     let tides: Tides = serde_json::from_str(&text)
             .map_err(|x| x.to_string())?;
 
-    let utc_now = Utc::now();
-
     // find the first tide after now, then get the 
     let mut idxs = vec![0, 1, 2];
     for (i, t) in tides.predictions.iter().enumerate() {
-        // if we come across the first tide after now
-        if t.t > utc_now {
+        // if we come across the first tide after now        
+        dbg!(&station.short_name, &t.t, &now);
+        if t.t > now {
             idxs = vec![i-1, i, i+1];
             break;
         }
