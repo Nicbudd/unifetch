@@ -81,7 +81,7 @@ async fn do_tide_station(station: &TidalStation) -> Result<String, String> {
 
     let url = format!("https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&begin_date={yesterday}&end_date={tomorrow}&datum=MLLW&station={station_id}&time_zone=gmt&units=english&interval=hilo&format=json"); 
 
-    dbg!(&url);
+    // dbg!(&url);
 
     let req = reqwest::get(url).await.map_err(|x| x.to_string())?;
     let text = req.text().await.map_err(|x| x.to_string())?;
@@ -92,7 +92,6 @@ async fn do_tide_station(station: &TidalStation) -> Result<String, String> {
     let mut idxs = vec![0, 1, 2];
     for (i, t) in tides.predictions.iter().enumerate() {
         // if we come across the first tide after now        
-        dbg!(&station.short_name, &t.t, &now);
         if t.t > now {
             idxs = vec![i-1, i, i+1];
             break;
@@ -113,8 +112,6 @@ async fn do_tide_station(station: &TidalStation) -> Result<String, String> {
         .map(|x| x.to_string())
         .collect::<Vec<String>>()
         .join(", ");
-
-    // dbg!(&s);
 
     Ok(format!("{Bold}{}{Reset}: {s}\n", station.short_name))
 }
