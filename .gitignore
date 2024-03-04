@@ -2,3 +2,4 @@ target/
 config/*
 
 Cargo.lock
+.vscode/
