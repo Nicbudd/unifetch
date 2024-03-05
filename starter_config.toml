@@ -14,3 +14,28 @@ tides = true
 [wxer]
 addresses = ["http://localhost:6080", "http://ganymede:6080", 
 "http://graymuzzle:6080", "http://cherrypi:6080"]
+
+
+[[tides]]
+id = 8429489
+short_name = "HAMPTON"
+
+[[tides]]
+id = 8419870
+short_name = "PORSMTH"
+
+[[tides]]
+id = 8421897
+short_name = "DVR POINT"
+
+[[tides]]
+id = 8420411
+short_name = "CCHECO R"
+
+[[tides]]
+id = 8422687
+short_name = "SQMSCT RVR"
+
+[[tides]]
+id = 8427031
+short_name = "ISLES SHLS"
