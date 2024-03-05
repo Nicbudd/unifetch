@@ -12,8 +12,6 @@ use std::fmt;
 use chrono::{Utc, DateTime};
 
 use wxer_lib::*;
-use super::Args;
-
 
 
 // WEATHER DATA ------------------------------------------------------------------------------------------------------

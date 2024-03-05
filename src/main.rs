@@ -5,6 +5,7 @@ mod random;
 mod wx; 
 mod updates; 
 mod tides;
+mod config;
 
 use std::env;
 
@@ -73,26 +74,14 @@ pub struct Args {
 async fn main() {
 
     // parse args
-    let mut args = Args::parse();
+    let args = Args::parse();
 
-    // dbg!(&cli_args);
-
-    if args.default || !(args.random || args.solar_lunar || 
-        args.current_conditions || args.forecast || args.teleconnections || 
-        args.earthquakes || args.tides) {
-            
-            args.random = true;
-            args.solar_lunar = true;
-            args.current_conditions = true;
-            args.teleconnections = true;
-            args.earthquakes = true;
-            args.tides = true;
-    } 
-
+    // open config file
+    let config = config::read_config_file(&args).unwrap();
 
     // actually start doing stuff
 
-    // asyncronous functions
+    // sync functions
     if !args.disable_header {
         header();
     }
@@ -101,26 +90,36 @@ async fn main() {
         random::random_section();
     }
 
+    // async functions
     tokio::join!(
-        updates::updates(&args),
+        updates::updates(&config),
 
-        solarlunar::solar_lunar(&args), 
+        solarlunar::solar_lunar(&config), 
 
-        wx::conditions::current_conditions(&args),
-        wx::forecast::forecast(&args),
-        wx::tele::teleconnections(&args),
+        wx::conditions::current_conditions(&config),
+        wx::forecast::forecast(&config),
+        wx::tele::teleconnections(&config),
 
         // time_and_date();
 
+        // obscure calendars/clocks
+
         // Scrape GasBuddy
         // gas_prices();
+
         // forecast_analysis();
         // climatology();
         // stock_market();
 
-        tides::tides(&args),
+        // cpu temps, hardware utilization
+
+        // kernel info?
+
+        // astrology?
+
+        tides::tides(&config),
         
-        earthquake::earthquakes(&args)
+        earthquake::earthquakes(&config)
 
     );
 

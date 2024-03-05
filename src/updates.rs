@@ -6,7 +6,7 @@ use toml::Table;
 
 use crate::common;
 use common::TermStyle::*;
-// use common::Style;
+use crate::config::Config;
 
 fn str_to_version(s: &str) -> Result<(usize, usize, usize)> {
     let nums: Vec<&str> = s.split(".").collect();
@@ -53,9 +53,9 @@ async fn latest_version() -> Result<String> {
 }
 
 
-use super::Args;
-pub async fn updates(args: &Args) {
-    if args.disable_update_notif {
+
+pub async fn updates(config: &Config) {
+    if !config.enabled_modules.updates {
         return;
     }
 

@@ -1,5 +1,6 @@
 use crate::common;
 use common::TermStyle::*;
+use crate::config::Config;
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -88,10 +89,9 @@ fn generate_solar_lunar_string(json: serde_json::Value) -> Result<String, String
     ))
 }    // dbg!(&r);
 
-use super::Args;
-pub async fn solar_lunar(args: &Args) {
+pub async fn solar_lunar(config: &Config) {
 
-    if !args.solar_lunar {
+    if !config.enabled_modules.solarlunar {
         return;
     }
 

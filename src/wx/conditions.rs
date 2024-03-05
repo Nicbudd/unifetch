@@ -1,5 +1,6 @@
 use crate::common;
 use crate::wx::*;
+use crate::config::Config;
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -284,10 +285,9 @@ async fn current_conditions_handler() -> Result<String, String> {
 
 }
 
-use super::Args;
-pub async fn current_conditions(args: &Args) {
+pub async fn current_conditions(config: &Config) {
 
-    if !args.current_conditions {
+    if !config.enabled_modules.current_conditions {
         return;
     }
 

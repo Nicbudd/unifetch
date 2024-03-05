@@ -3,10 +3,10 @@ use csv;
 use serde::Deserialize;
 
 use crate::wx::*;
+use crate::config::Config;
 
-use super::Args;
-pub async fn teleconnections(args: &Args){
-    if !args.teleconnections {
+pub async fn teleconnections(config: &Config){
+    if !config.enabled_modules.teleconnections {
         return;
     }
 

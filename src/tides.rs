@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use crate::common;
 use common::*;
+use crate::config::Config;
 use common::TermStyle::*;
 
 use serde::Deserialize;
@@ -13,9 +14,8 @@ struct TidalStation {
     short_name: String
 }
 
-use super::Args;
-pub async fn tides(args: &Args){
-    if !args.tides {
+pub async fn tides(config: &Config){
+    if !config.enabled_modules.tides {
         return;
     }
 

@@ -1,6 +1,7 @@
 use crate::common;
 use common::TermStyle::*;
 use common::Style;
+use crate::config::Config;
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -311,9 +312,8 @@ async fn earthquake_handler() -> Result<String, String> {
     Ok(s)
 }
 
-use super::Args;
-pub async fn earthquakes(args: &Args) {
-    if !args.earthquakes {
+pub async fn earthquakes(config: &Config) {
+    if !config.enabled_modules.earthquakes {
         return;
     }
 

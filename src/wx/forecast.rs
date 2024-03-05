@@ -5,6 +5,7 @@ use std::time::Duration;
 use crate::common;
 use common::TermStyle::*;
 use common::Style;
+use crate::config::Config;
 
 use crate::wx::*;
 
@@ -262,9 +263,8 @@ async fn forecast_handler() -> Result<String, String> {
     Ok(s)
 }
 
-use super::Args;
-pub async fn forecast(args: &Args) {
-    if !args.forecast {
+pub async fn forecast(config: &Config) {
+    if !config.enabled_modules.forecast {
         return;
     }
 
