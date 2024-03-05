@@ -1,4 +1,5 @@
 use crate::common;
+use crate::config::Service;
 use common::TermStyle::*;
 use common::Style;
 use crate::config::Config;
@@ -67,7 +68,7 @@ struct Earthquake { // put the USGS formatted earthquakes in a form that's easy 
     longitude: f32,
     depth: f32,
     id: String,
-    dist: f32,
+    dist: Option<f32>,
 }
 
 impl Hash for Earthquake {
@@ -86,8 +87,14 @@ impl Eq for Earthquake {}
 
 impl Earthquake {
     #[allow(non_snake_case)]
-    fn from_USGS(usgs: USGSEarthquake, lat: f32, long: f32) -> Result<Self, String> {
+    fn from_USGS(usgs: USGSEarthquake, home_coords: Option<(f32, f32)>) -> Result<Self, String> {
         // dbg!(&usgs);
+
+        let dist = if let Some(coords) = home_coords {
+            Some(distance_between_coords_miles(usgs.geometry.coordinates.1, usgs.geometry.coordinates.0, coords.0, coords.1))
+        } else {
+            None
+        };
 
         Ok(Earthquake { 
             shaketype: usgs.shaketype,
@@ -100,7 +107,7 @@ impl Earthquake {
             latitude: usgs.geometry.coordinates.1,
             longitude: usgs.geometry.coordinates.0,
             depth: usgs.geometry.coordinates.2,
-            dist: distance_between_coords_miles(usgs.geometry.coordinates.1, usgs.geometry.coordinates.0, lat, long),
+            dist,
             id: usgs.id,
         })
     }
@@ -176,8 +183,8 @@ impl fmt::Display for Earthquake {
             "".into()
         };
 
-        let dist = if self.dist < 1000. {
-            format!(" ({:.0} mi)", self.dist)
+        let dist = if self.dist.is_some_and(|dist| dist < 1000.) {
+            format!(" ({:.0} mi)", self.dist.unwrap())
         } else {
             String::new()
         };
@@ -186,7 +193,7 @@ impl fmt::Display for Earthquake {
     }
 }
 
-async fn get_earthquakes(url: &str, client: &reqwest::Client, lat: f32, long: f32) -> Result<Vec<Earthquake>, String> {
+async fn get_earthquakes(url: &str, client: &reqwest::Client, home_coords: Option<(f32, f32)>) -> Result<Vec<Earthquake>, String> {
 
     // dbg!(&url);
 
@@ -205,7 +212,7 @@ async fn get_earthquakes(url: &str, client: &reqwest::Client, lat: f32, long: f3
 
     let quakes = usgs.features
                 .into_iter()
-                .map(|x| Earthquake::from_USGS(x, lat, long))
+                .map(|x| Earthquake::from_USGS(x, home_coords))
                 .collect::<Result<Vec<_>, String>>()?;
 
     Ok(quakes) 
@@ -245,61 +252,78 @@ fn distance_between_coords_miles(lat1: f32, long1: f32, lat2: f32, long2: f32) -
     d
 } 
 
-async fn earthquake_handler() -> Result<String, String> {
+async fn earthquake_handler(config: &Config) -> Result<String, String> {
     // "tallest skyscrapers" (>5 mag) for last 3 months of earthquakes
     // "local" earthquakes - earthquakes >2 mag within 150 km of PSM or >3 mag within 300km or >4 mag within 800km
 
 
     let mut s = common::title("EARTHQUAKES");
 
-    //TODO: Make this more generic
-    let lat = 43;
-    let long = -71;
+    let coords_opt = config.localization.get_coordinates(&Service::Usgs);
 
-    let lat_f = 43.08;
-    let long_f = -70.86;
+    // this boolean can be adjusted later
+    let get_local_quakes: bool = coords_opt.is_some();
+
 
     let now = Utc::now();
     let three_months_ago = now - chrono::Duration::days(180);
     let starttime = three_months_ago.format("%Y-%m-%d");
     
-    // >5 mag anywhere for last 3 months of earthquakes
-    let url1 = format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime={starttime}&minmagnitude=5&orderby=time");
-    // earthquakes >2 mag within 150 km of PSM
-    let url2 = format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=2&latitude={lat}&longitude={long}&maxradiuskm=150&orderby=time");
-    // earthquakes >3 mag within 300 km of PSM
-    let url3 = format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=3&latitude={lat}&longitude={long}&maxradiuskm=300&orderby=time");
-    // earthquakes >4 mag within 800 km of PSM
-    let url4 = format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=4&latitude={lat}&longitude={long}&maxradiuskm=800&orderby=time");
-
     let client = reqwest::Client::new();
 
-    // global quakes
-    let v1 = get_earthquakes(&url1, &client, lat_f, long_f).await?;
+    // >5 mag anywhere for last 3 months of earthquakes
+    let url1 = format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime={starttime}&minmagnitude=5&orderby=time");
 
-    // local quakes
-    let v2 = get_earthquakes(&url2, &client, lat_f, long_f).await?;
-    let v3 = get_earthquakes(&url3, &client, lat_f, long_f).await?;
-    let v4 = get_earthquakes(&url4, &client, lat_f, long_f).await?;
+    if get_local_quakes {
+        let lat_f = coords_opt.unwrap().0;
+        let long_f = coords_opt.unwrap().1;
 
-    // get a set containing local quakes to remove duplicates
-    let mut local_quakes = HashSet::new();
-    v2.iter().chain(v3.iter()).chain(v4.iter()).for_each(|x| {local_quakes.insert(x);});
+        let lat = lat_f.round() as i32;
+        let long = long_f.round() as i32;
 
-    // collect them back into a vector so we can sort them by distance.
-    let mut local_quakes = local_quakes.iter().collect::<Vec<_>>();
-    local_quakes.sort_by(|a, b| a.dist.partial_cmp(&b.dist).unwrap_or(Ordering::Greater));
+        // earthquakes >2 mag within 150 km of home
+        let url2 = format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=2&latitude={lat}&longitude={long}&maxradiuskm=150&orderby=time");
+        // earthquakes >3 mag within 300 km of home
+        let url3 = format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=3&latitude={lat}&longitude={long}&maxradiuskm=300&orderby=time");
+        // earthquakes >4 mag within 800 km of home
+        let url4 = format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=4&latitude={lat}&longitude={long}&maxradiuskm=800&orderby=time");
+    
+        // local quakes
+        let v2 = get_earthquakes(&url2, &client, coords_opt).await?;
+        let v3 = get_earthquakes(&url3, &client, coords_opt).await?;
+        let v4 = get_earthquakes(&url4, &client, coords_opt).await?;    
+   
+        // dbg!(url2, url3, url4, &v2, &v3, &v4);
 
+        // todo: filter out some of the quakes. this is far too many for active areas
+        // also allow users to set thresholds
 
-    if local_quakes.len() >= 1 {
-        s.push_str(&format!("Local Earthquakes:\n"));
+        // get a set containing local quakes to remove duplicates
+        let mut local_quakes = HashSet::new();
+        v2.iter().chain(v3.iter()).chain(v4.iter()).for_each(|x| {local_quakes.insert(x);});
 
-        for q in local_quakes {
-            s.push_str(&format!("{}", q));
-            // dbg!(&q);
+        // collect them back into a vector so we can sort them by distance.
+        let mut local_quakes = local_quakes.iter().collect::<Vec<_>>();
+        local_quakes.sort_by(|a, b| a.dist.partial_cmp(&b.dist).unwrap_or(Ordering::Greater));
+
+        if local_quakes.len() >= 1 {
+            s.push_str(&format!("Local Earthquakes:\n"));
+
+            for q in local_quakes {
+                s.push_str(&format!("{}", q));
+                // dbg!(&q);
+            }
+            s.push_str("\n");
+        } else {
+            s.push_str(&format!("Local Earthquakes: None\n"));
         }
-        s.push_str("\n");
+    } else {
+        s.push_str(&format!("Local Earthquakes Disabled\n"));
     }
+
+
+    // global quakes
+    let v1 = get_earthquakes(&url1, &client, coords_opt).await?;
 
     let global_quakes = tallest_skyscrapers(&v1);
 
@@ -317,7 +341,7 @@ pub async fn earthquakes(config: &Config) {
         return;
     }
 
-    match earthquake_handler().await {
+    match earthquake_handler(config).await {
         Ok(s) => {println!("{}", s)},
         Err(e) => {println!("{}{}", common::title("EARTHQUAKE"), e)},
     }

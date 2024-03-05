@@ -1,4 +1,5 @@
 use crate::common;
+use crate::config::Service;
 use crate::wx::*;
 use crate::config::Config;
 
@@ -209,15 +210,27 @@ async fn wxer_query(loc: &str, time: &str, config: &Config) -> Result<String, St
 
 async fn current_conditions_handler(config: &Config) -> Result<String, String> {
 
+    // todo: pull this info from config file
+
     let psm_station: Station = Station {
         coords: (43.08, -70.82),
         altitude: 30.,
         name: String::from("KPSM"),
     };  
 
+    // todo: make this optional
+    let coords = config.localization
+        .get_coordinates(&Service::Wxer)
+        .ok_or("wxer could not get coordinates from config file.")?;
+
+    let altitude = config.localization
+        .get_altitude(&Service::Wxer)
+        .ok_or("wxer could not get coordinates from config file.")?;
+
+
     let apt_station: Station = Station {
-        coords: (43.00, 0.0), // im not giving that away
-        altitude: 24.,
+        coords,
+        altitude,
         name: String::from("APT"),
     }; 
 

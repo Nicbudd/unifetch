@@ -1,6 +1,22 @@
 [general]
+
+
+# Enter coordinates in here (optional)
+# NOTE: to protect privacy, only the services you explicitly enable should be 
+# able to see these coordinates. There is some protection from coding errors
+# accidentally exposing your coordinates to the wrong service. All of the
+# modules are currently trusted, so security was not a concern while designing
+# the system.
+[localization]
+# NO GUARANTEES ARE MADE ABOUT THE PRIVACY OF YOUR COORDINATES. USE AT OWN RISK
 # latitude =
 # longitude =
+
+# Altitude (above mean sea level) follows same rules as coordinates.
+# altitude = # in meters
+
+# Allow external services to see your coordinates. Uncomment to enable.
+# allowed_services = ["usno", "wxer", "usgs"]
 
 [default_modules]
 weather = true
@@ -11,31 +27,35 @@ random = true
 solarlunar = true
 tides = true
 
+# inset 
 [wxer]
-addresses = ["http://localhost:6080", "http://ganymede:6080", 
-"http://graymuzzle:6080", "http://cherrypi:6080"]
+addresses = ["http://localhost:6080"]
 
 
-[[tides]]
-id = 8429489
-short_name = "HAMPTON"
+# tidal stations
+# use this to find station IDs 
+# https://tidesandcurrents.noaa.gov/tide_predictions.html
 
-[[tides]]
-id = 8419870
-short_name = "PORSMTH"
+# [[tides]]
+# id = 8429489
+# short_name = "HAMPTON"
 
-[[tides]]
-id = 8421897
-short_name = "DVR POINT"
+# [[tides]]
+# id = 8419870
+# short_name = "PORSMTH"
 
-[[tides]]
-id = 8420411
-short_name = "CCHECO R"
+# [[tides]]
+# id = 8421897
+# short_name = "DVR POINT"
 
-[[tides]]
-id = 8422687
-short_name = "SQMSCT RVR"
+# [[tides]]
+# id = 8420411
+# short_name = "CCHECO R"
 
-[[tides]]
-id = 8427031
-short_name = "ISLES SHLS"
+# [[tides]]
+# id = 8422687
+# short_name = "SQMSCT RVR"
+
+# [[tides]]
+# id = 8427031
+# short_name = "ISLES SHLS"

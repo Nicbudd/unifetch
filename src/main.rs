@@ -77,7 +77,15 @@ async fn main() {
     let args = Args::parse();
 
     // open config file
-    let config = config::read_config_file(&args).unwrap();
+    let config_opt = config::read_config_file(&args);
+
+    if let Err(e) = config_opt {
+        println!("{}CONFIG FILE PARSING ERROR{}\n{e:?}", 
+            common::Style::error(), common::TermStyle::Reset);
+        return;
+    }
+
+    let config = config_opt.unwrap();
 
     // actually start doing stuff
 
@@ -109,6 +117,10 @@ async fn main() {
 
         // forecast_analysis();
         // climatology();
+
+        // dow, nasdaq, s&p, bitcoin, eth, usdt
+        // apple, microsoft, nvidia, google, amazon, meta
+        // exchange rates (CAD, JPY, EUR, RUB)
         // stock_market();
 
         // cpu temps, hardware utilization

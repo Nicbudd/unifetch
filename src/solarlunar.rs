@@ -1,6 +1,6 @@
 use crate::common;
 use common::TermStyle::*;
-use crate::config::Config;
+use crate::config::{Service, Config};
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -97,6 +97,16 @@ pub async fn solar_lunar(config: &Config) {
 
     let mut s: String = common::title("SOLAR & LUNAR");
 
+    let coordinates_opt = config.localization
+        .get_coordinates(&Service::Usno);
+
+    if coordinates_opt.is_none() {
+        println!("{s}Coordinates not provided, cannot get solar/lunar times from unknown location\n");
+        return;
+    }
+
+    let coords_str = common::coords_str(coordinates_opt.unwrap());
+
     let now = Local::now();
 
     let tz_offset = now.offset().local_minus_utc() / 60 / 60;
@@ -104,7 +114,7 @@ pub async fn solar_lunar(config: &Config) {
     let mut map = HashMap::new();
 
     map.insert("date", now.format("%Y-%m-%d").to_string());
-    map.insert("coords", common::coords_str());
+    map.insert("coords", coords_str);
     map.insert("tz", tz_offset.to_string());
 
 

@@ -72,6 +72,47 @@ pub struct Modules {
     pub updates: bool,
 }
 
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Service {
+    Wxer,
+    Usno,
+    Usgs,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct Localization {
+    latitude: Option<f32>,
+    longitude: Option<f32>,
+    altitude: Option<f32>,
+
+    #[serde(default)]
+    allowed_services: Vec<Service>,
+}
+
+impl Localization {
+    // this function allows services to access the coordinates
+    // it's not secure and is easy to "fool", but all of the modules are 
+    // isolated and trusted for now.
+    pub fn get_coordinates(&self, service: &Service) -> Option<(f32, f32)> {
+        if self.allowed_services.contains(service) &&
+            self.latitude.is_some() && self.longitude.is_some() {
+            return Some((self.latitude.unwrap(), self.longitude.unwrap()));
+
+        } else {
+            return None;
+        }
+    }
+    pub fn get_altitude(&self, service: &Service) -> Option<f32> {
+        if self.allowed_services.contains(service) {
+            return self.altitude;
+        } else {
+            return None;
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Wxer {
     pub addresses: Vec<String>
@@ -79,16 +120,17 @@ pub struct Wxer {
 
 #[derive(Debug, Deserialize)]
 pub struct GeneralConfig {
-    pub latitude: Option<f32>,
-    pub longitude: Option<f32>,
+
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    #[serde(skip_serializing)]
+    pub localization: Localization,
+
     pub general: GeneralConfig,
     pub wxer: Wxer,
     pub tides: Vec<tides::TidalStation>,
-
 
     default_modules: Modules,
 
@@ -98,20 +140,16 @@ pub struct Config {
 
 pub fn read_config_file(args: &Args) -> Result<Config> {
     let home_dir = home_dir().context("Could not find users home directory.")?;
-    let config_location = home_dir.join(".config").join("unifetch").join("config.toml");
+    let config_location = home_dir
+        .join(".config").join("unifetch").join("config.toml");
     
     let mut config: Config = toml::from_str(&fs::read_to_string(config_location)?)?;
 
     // set the default modules (if we are running all default modules)
-    if args.default || !(
-        args.random || 
-        args.solar_lunar || 
-        args.current_conditions || 
-        args.forecast || 
-        args.teleconnections || 
-        args.earthquakes || 
-        args.tides
-    ) {
+    if args.default || 
+        !(args.random || args.solar_lunar || args.current_conditions || 
+        args.forecast || args.teleconnections || args.earthquakes || args.tides)
+    {
             
         config.enabled_modules = config.default_modules.clone();
     } 
