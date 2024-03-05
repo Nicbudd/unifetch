@@ -6,6 +6,8 @@ use anyhow::{self, Context, Result};
 use home::home_dir;
 use serde::Deserialize;
 
+use crate::tides;
+
 // one of the stupidest functions I've ever written
 fn t() -> bool {
     true
@@ -85,6 +87,8 @@ pub struct GeneralConfig {
 pub struct Config {
     pub general: GeneralConfig,
     pub wxer: Wxer,
+    pub tides: Vec<tides::TidalStation>,
+
 
     default_modules: Modules,
 

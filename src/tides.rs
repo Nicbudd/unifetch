@@ -5,12 +5,14 @@ use common::*;
 use crate::config::Config;
 use common::TermStyle::*;
 
+use futures::future::try_join_all;
 use serde::Deserialize;
 use chrono::{Local, Duration, DateTime, NaiveDateTime, Utc, TimeZone};
 
-
-struct TidalStation {
+#[derive(Debug, Deserialize)]
+pub struct TidalStation {
     id: u64,
+    #[serde(alias="name")]
     short_name: String
 }
 
@@ -19,7 +21,7 @@ pub async fn tides(config: &Config){
         return;
     }
 
-    match tides_handler().await {
+    match tides_handler(config).await {
         Ok(s) => {println!("{}", s)},
         Err(e) => {println!("{}{}", common::title("TIDES"), e)},
     }
@@ -88,11 +90,12 @@ async fn do_tide_station(station: &TidalStation) -> Result<String, String> {
     let tides: Tides = serde_json::from_str(&text)
             .map_err(|x| x.to_string())?;
 
-    // find the first tide after now, then get the 
-    let mut idxs = vec![0, 1, 2];
+    // find the first tide after now
+    let mut idxs = vec![0, 1, 2]; // default to the first few
     for (i, t) in tides.predictions.iter().enumerate() {
         // if we come across the first tide after now        
         if t.t > now {
+            // get the previous tide, the first tide after now, and then the next one
             idxs = vec![i-1, i, i+1];
             break;
         }
@@ -116,22 +119,18 @@ async fn do_tide_station(station: &TidalStation) -> Result<String, String> {
     Ok(format!("{Bold}{}{Reset}: {s}\n", station.short_name))
 }
 
-async fn tides_handler() -> Result<String, String>  {
-    let mut s = common::title("TIDES");
+async fn tides_handler(config: &Config) -> Result<String, String>  {
+    let s = common::title("TIDES");
 
-    let hampton_harbor = TidalStation{id: 8429489, short_name: "HAMPTON".into()};
-    let portsmouth = TidalStation{id: 8419870, short_name: "PORSMTH".into()};
-    let dover_point = TidalStation{id: 8421897, short_name: "DVR POINT".into()};
-    let cocheco_river = TidalStation{id: 8420411, short_name: "CCHECO R".into()};
-    let squamscott_river = TidalStation{id: 8422687, short_name: "SQMSCT RVR".into()};
-    let isles_of_shoals = TidalStation{id: 8427031, short_name: "ISLES SHLS".into()};
+    let mut futures = vec![];
 
-    s.push_str(&do_tide_station(&isles_of_shoals).await?);
-    s.push_str(&do_tide_station(&portsmouth).await?);
-    s.push_str(&do_tide_station(&hampton_harbor).await?);
-    s.push_str(&do_tide_station(&dover_point).await?);
-    s.push_str(&do_tide_station(&cocheco_river).await?);
-    s.push_str(&do_tide_station(&squamscott_river).await?);
+    for station in &config.tides {
+        futures.push(do_tide_station(station))
+    }
 
-    Ok(s)  
+    let string = try_join_all(futures)
+        .await?
+        .join("");
+
+    Ok(s + &string)
 }
