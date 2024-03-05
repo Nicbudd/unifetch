@@ -6,10 +6,14 @@ use anyhow::{self, Context, Result};
 use home::home_dir;
 use serde::Deserialize;
 
+// one of the stupidest functions I've ever written
+fn t() -> bool {
+    true
+}
 
 #[derive(Debug, Deserialize, Clone, Copy, Default)]
 pub struct Modules {
-    #[serde(default,
+    #[serde(default = "t",
         alias = "currentconditions", 
         alias = "conditions", 
         alias = "analysis",
@@ -18,32 +22,32 @@ pub struct Modules {
         alias = "wxer")]
     pub current_conditions: bool,
 
-    #[serde(default,
+    #[serde(default = "t",
         alias = "forecast", 
         alias = "future_weather", 
         alias = "futurecast",
         alias = "futurewx")]
     pub forecast: bool,
 
-    #[serde(default,
+    #[serde(default = "t",
         alias = "tele", 
         alias = "nao", 
         alias = "enso")]
     pub teleconnections: bool,
 
-    #[serde(default,
+    #[serde(default = "t",
         alias = "quake", 
         alias = "quakes", 
         alias = "earthquake",)]
     pub earthquakes: bool,
 
-    #[serde(default,
+    #[serde(default = "t",
         alias = "rand", 
         alias = "dice", 
         alias = "randomize",)]
     pub random: bool,
 
-    #[serde(default,
+    #[serde(default = "t",
         alias = "solar", 
         alias = "lunar", 
         alias = "sunrise",
@@ -55,7 +59,7 @@ pub struct Modules {
         alias = "sunandmoon",)]
     pub solarlunar: bool,
 
-    #[serde(default,
+    #[serde(default = "t",
         alias = "tidal",
         alias = "tide",
         alias = "tidechart",
@@ -73,8 +77,8 @@ pub struct Wxer {
 
 #[derive(Debug, Deserialize)]
 pub struct GeneralConfig {
-    pub latitude: f32,
-    pub longitude: f32,
+    pub latitude: Option<f32>,
+    pub longitude: Option<f32>,
 }
 
 #[derive(Debug, Deserialize)]

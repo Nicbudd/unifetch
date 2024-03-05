@@ -1,0 +1,16 @@
+[general]
+# latitude =
+# longitude =
+
+[default_modules]
+weather = true
+forecast = false
+teleconnections = false
+earthquake = true
+random = true
+solarlunar = true
+tides = true
+
+[wxer]
+addresses = ["http://localhost:6080", "http://ganymede:6080", 
+"http://graymuzzle:6080", "http://cherrypi:6080"]

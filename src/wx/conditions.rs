@@ -6,10 +6,8 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use std::fs;
 use std::time::Duration;
 
-use home::home_dir;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use chrono::{Local, Utc, DateTime, TimeZone, NaiveDateTime, Datelike, LocalResult};
@@ -173,16 +171,9 @@ impl fmt::Debug for CloudLayer {
 struct StationEntryWithTime(DateTime<Utc>, WxEntry);
 
 
-async fn wxer_query(loc: &str, time: &str) -> Result<String, String> {
+async fn wxer_query(loc: &str, time: &str, config: &Config) -> Result<String, String> {
 
-    let mut path = home_dir().ok_or(String::from("Could not find the user's home directory!"))?;
-
-    path.push(".config/unifetch/wxer_addr.txt");
-
-    let addresses_string = fs::read_to_string(path)
-                            .map_err(|e| e.to_string())?;
-
-    let addresses = addresses_string.lines();
+    let addresses = &config.wxer.addresses;
     
     let client = reqwest::Client::new();
 
@@ -216,12 +207,7 @@ async fn wxer_query(loc: &str, time: &str) -> Result<String, String> {
 
 
 
-
-
-
-
-
-async fn current_conditions_handler() -> Result<String, String> {
+async fn current_conditions_handler(config: &Config) -> Result<String, String> {
 
     let psm_station: Station = Station {
         coords: (43.08, -70.82),
@@ -242,8 +228,8 @@ async fn current_conditions_handler() -> Result<String, String> {
     };
 
 
-    let apt_conditions = wxer_query("local", "hourly").await?;
-    let psm_conditions = wxer_query("psm", "hourly").await?;
+    let apt_conditions = wxer_query("local", "hourly", config).await?;
+    let psm_conditions = wxer_query("psm", "hourly", config).await?;
 
     // dbg!(&local_conditions);
     // dbg!(&psm_conditions);
@@ -280,9 +266,7 @@ async fn current_conditions_handler() -> Result<String, String> {
     s.push_str(&unh_line);
     s.push_str(&psm_line);
 
-
     Ok(s)   
-
 }
 
 pub async fn current_conditions(config: &Config) {
@@ -291,7 +275,7 @@ pub async fn current_conditions(config: &Config) {
         return;
     }
 
-    match current_conditions_handler().await {
+    match current_conditions_handler(config).await {
         Ok(s) => {println!("{}", s)},
         Err(e) => {println!("{}{}", common::title("CURRENT CONDITIONS"), e)},
     }

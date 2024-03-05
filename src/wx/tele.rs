@@ -114,6 +114,7 @@ fn format_enso(enso: (Vec<f32>, String)) -> Result<String, String> {
 #[derive(Deserialize)]
 struct NaoRecord {
     lead: u32,
+    #[allow(dead_code)]
     time: NaiveDate,
     nao_index: f32,
     valid_time: NaiveDate,

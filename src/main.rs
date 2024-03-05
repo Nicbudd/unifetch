@@ -113,7 +113,7 @@ async fn main() {
 
         // cpu temps, hardware utilization
 
-        // kernel info?
+        // kernel/os info?
 
         // astrology?
 
