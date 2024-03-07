@@ -1,7 +1,10 @@
 use crate::common;
+use crate::config::DistanceUnits;
 use crate::config::Service;
 use common::TermStyle::*;
 use common::Style;
+use futures::future;
+use futures::future::try_join_all;
 use crate::config::Config;
 
 use std::cmp::Ordering;
@@ -252,6 +255,14 @@ fn distance_between_coords_miles(lat1: f32, long1: f32, lat2: f32, long2: f32) -
     d
 } 
 
+fn convert_to_km(units: &DistanceUnits, value: f32) -> f32 {
+    match units {
+        DistanceUnits::Kilometers => value,
+        DistanceUnits::NauticalMiles => value * 1.852,
+        DistanceUnits::Miles => value * 1.60934,
+    }
+}
+
 async fn earthquake_handler(config: &Config) -> Result<String, String> {
     // "tallest skyscrapers" (>5 mag) for last 3 months of earthquakes
     // "local" earthquakes - earthquakes >2 mag within 150 km of PSM or >3 mag within 300km or >4 mag within 800km
@@ -262,8 +273,7 @@ async fn earthquake_handler(config: &Config) -> Result<String, String> {
     let coords_opt = config.localization.get_coordinates(&Service::Usgs);
 
     // this boolean can be adjusted later
-    let get_local_quakes: bool = coords_opt.is_some();
-
+    let get_local_quakes: bool = coords_opt.is_some() && config.earthquakes.enable_local;
 
     let now = Utc::now();
     let three_months_ago = now - chrono::Duration::days(180);
@@ -281,29 +291,24 @@ async fn earthquake_handler(config: &Config) -> Result<String, String> {
         let lat = lat_f.round() as i32;
         let long = long_f.round() as i32;
 
-        // earthquakes >2 mag within 150 km of home
-        let url2 = format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=2&latitude={lat}&longitude={long}&maxradiuskm=150&orderby=time");
-        // earthquakes >3 mag within 300 km of home
-        let url3 = format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=3&latitude={lat}&longitude={long}&maxradiuskm=300&orderby=time");
-        // earthquakes >4 mag within 800 km of home
-        let url4 = format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=4&latitude={lat}&longitude={long}&maxradiuskm=800&orderby=time");
-    
-        // local quakes
-        let v2 = get_earthquakes(&url2, &client, coords_opt).await?;
-        let v3 = get_earthquakes(&url3, &client, coords_opt).await?;
-        let v4 = get_earthquakes(&url4, &client, coords_opt).await?;    
-   
-        // dbg!(url2, url3, url4, &v2, &v3, &v4);
+        let mut urls = vec![];
 
-        // todo: filter out some of the quakes. this is far too many for active areas
-        // also allow users to set thresholds
+        
+        for rad in &config.earthquakes.local_search {
+            let mag = rad.min_magnitude;
+            let rad_km = convert_to_km(&config.earthquakes.units, rad.radius);
+            urls.push(format!("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude={mag}&latitude={lat}&longitude={long}&maxradiuskm={rad_km}&orderby=time"));
+        }
 
-        // get a set containing local quakes to remove duplicates
-        let mut local_quakes = HashSet::new();
-        v2.iter().chain(v3.iter()).chain(v4.iter()).for_each(|x| {local_quakes.insert(x);});
+        let mut futures = vec![];
 
-        // collect them back into a vector so we can sort them by distance.
-        let mut local_quakes = local_quakes.iter().collect::<Vec<_>>();
+        for url in &urls {
+            futures.push(get_earthquakes(url, &client, coords_opt));
+        }
+
+        let local_quakes: Vec<Vec<Earthquake>> = try_join_all(futures).await?;
+        let local_quakes: HashSet<&Earthquake> = local_quakes.iter().flatten().collect();
+        let mut local_quakes: Vec<&&Earthquake> = local_quakes.iter().collect();
         local_quakes.sort_by(|a, b| a.dist.partial_cmp(&b.dist).unwrap_or(Ordering::Greater));
 
         if local_quakes.len() >= 1 {
@@ -337,7 +342,8 @@ async fn earthquake_handler(config: &Config) -> Result<String, String> {
 }
 
 pub async fn earthquakes(config: &Config) {
-    if !config.enabled_modules.earthquakes {
+    if !config.enabled_modules.earthquakes ||
+    (!config.earthquakes.enable_global && !config.earthquakes.enable_local) {
         return;
     }
 

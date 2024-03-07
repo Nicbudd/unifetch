@@ -5,6 +5,7 @@ use super::Args;
 use anyhow::{self, Context, Result};
 use home::home_dir;
 use serde::Deserialize;
+use serde;
 
 use crate::tides;
 
@@ -123,6 +124,40 @@ pub struct GeneralConfig {
 
 }
 
+#[derive(Debug, Deserialize, Default)]
+pub enum DistanceUnits {
+    #[serde(alias = "mi", alias = "english", alias = "imperial")]
+    Miles,
+
+    #[default]
+    #[serde(alias = "km", alias = "metric")]
+    Kilometers,
+
+    #[serde(alias = "nmi", alias = "nauts")]
+    NauticalMiles,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EarthquakeRadii {
+    pub min_magnitude: f32,
+    pub radius: f32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Earthquakes {
+    #[serde(default)]
+    pub units: DistanceUnits,
+
+    #[serde(default = "t")]
+    pub enable_local: bool, // must allow Usgs to access coordinates
+    
+    #[serde(default = "t")]
+    pub enable_global: bool,
+    
+    #[serde(default)]
+    pub local_search: Vec<EarthquakeRadii>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Config {
     #[serde(skip_serializing)]
@@ -133,6 +168,8 @@ pub struct Config {
     pub tides: Vec<tides::TidalStation>,
 
     default_modules: Modules,
+
+    pub earthquakes: Earthquakes,
 
     #[serde(skip)]
     pub enabled_modules: Modules,

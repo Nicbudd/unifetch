@@ -27,7 +27,9 @@ random = true
 solarlunar = true
 tides = true
 
-# inset 
+# Addresses for wxer, required for current conditions module.
+# unifetch will request these addresses in order, moving on if the address does
+# not respond.
 [wxer]
 addresses = ["http://localhost:6080"]
 
