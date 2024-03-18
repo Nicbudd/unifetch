@@ -3,12 +3,13 @@ use csv;
 use serde::Deserialize;
 
 use crate::wx::*;
-use crate::config::Config;
+use crate::config::{Config, Modules};
 
 pub async fn teleconnections(config: &Config){
-    if !config.enabled_modules.teleconnections {
+    if !config.enabled_modules.contains(&Modules::Teleconnections) {
         return;
     }
+
 
     match teleconnections_handler().await {
         Ok(s) => {println!("{}", s)},

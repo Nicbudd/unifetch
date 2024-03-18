@@ -106,6 +106,10 @@ impl Style {
     pub fn error() -> String {
         Style::new(&[Red, Bold])
     }
+
+    pub fn warning() -> String {
+        Style::new(&[Yellow, Bold])
+    }
 }
 
 

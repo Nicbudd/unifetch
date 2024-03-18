@@ -271,9 +271,9 @@ async fn current_conditions_handler(config: &Config) -> Result<String, String> {
     let psm_prelude = format!("{}: ⌛{}", psm_station.name, local_time_psm.format("%I:%M %p"));
     let unh_prelude = format!("{}: ⌛{}", unh_station.name, local_time_unh.format("%I:%M %p"));
 
-    let apt_line = station_line(&apt_prelude, latest_apt.1, true, &apt_db)?;
-    let psm_line = station_line(&psm_prelude, latest_psm.1, false, &psm_db)?;
-    let unh_line = station_line(&unh_prelude, latest_unh.1, false, &unh_db)?;
+    let apt_line = station_line(&apt_prelude, latest_apt.1, &config.current_weather.selected.parameters, true, &apt_db)?;
+    let psm_line = station_line(&psm_prelude, latest_psm.1, &config.current_weather.selected.parameters, false, &psm_db)?;
+    let unh_line = station_line(&unh_prelude, latest_unh.1, &config.current_weather.selected.parameters, false, &unh_db)?;
 
     s.push_str(&apt_line);
     s.push_str(&unh_line);
@@ -282,9 +282,12 @@ async fn current_conditions_handler(config: &Config) -> Result<String, String> {
     Ok(s)   
 }
 
+
+use crate::config::Modules;
+
 pub async fn current_conditions(config: &Config) {
 
-    if !config.enabled_modules.current_conditions {
+    if !config.enabled_modules.contains(&Modules::CurrentConditions) {
         return;
     }
 

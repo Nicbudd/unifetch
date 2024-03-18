@@ -53,9 +53,10 @@ async fn latest_version() -> Result<String> {
 }
 
 
+use crate::config::Modules;
 
 pub async fn updates(config: &Config) {
-    if !config.enabled_modules.updates {
+    if !config.enabled_modules.contains(&Modules::Updates) {
         return;
     }
 
