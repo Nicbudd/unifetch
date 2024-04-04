@@ -107,6 +107,7 @@ impl Style {
         Style::new(&[Red, Bold])
     }
 
+    #[allow(dead_code)]
     pub fn warning() -> String {
         Style::new(&[Yellow, Bold])
     }
@@ -125,7 +126,7 @@ pub fn terminal_line(c: char) -> String {
 // HELPER FUNCTIONS ------------------------------------------------------------
 
 pub fn title(s: &str) -> String {
-    format!("\n{:-^80}\n", s)
+    format!("{:-^80}\n", s)
 }
 
 pub async fn parse_request_loose_json(w: Result<reqwest::Response, reqwest::Error>) -> Result<serde_json::Value, String> {    

@@ -144,5 +144,5 @@ pub async fn solar_lunar(config: &Config) {
     }
 
 
-    println!("{}", s);
+    println!("{}\n", s);
 }

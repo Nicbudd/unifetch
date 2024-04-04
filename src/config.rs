@@ -9,7 +9,6 @@ use serde::Deserialize;
 use serde;
 
 use crate::tides;
-use wxer_lib;
 
 // one of the stupidest functions I've ever written
 fn t() -> bool {
@@ -119,7 +118,14 @@ pub struct Wxer {
 
 #[derive(Debug, Deserialize)]
 pub struct GeneralConfig {
+    // intentionally left blank for now
+}
 
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Teleconnections {
+    Enso,
+    Nao,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -272,6 +278,7 @@ pub struct Config {
     pub wxer: Wxer,
     
     pub current_weather: ConditionsConfig,
+    pub teleconnections: Vec<Teleconnections>,
     pub tides: Vec<tides::TidalStation>,
     pub earthquakes: Earthquakes,
     pub forecast: ForecastConfig,
