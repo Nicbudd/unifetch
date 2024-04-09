@@ -6,7 +6,7 @@ use toml::Table;
 
 use crate::common;
 use common::TermStyle::*;
-// use common::Style;
+use crate::config::Config;
 
 fn str_to_version(s: &str) -> Result<(usize, usize, usize)> {
     let nums: Vec<&str> = s.split(".").collect();
@@ -36,8 +36,9 @@ async fn latest_version() -> Result<String> {
                         .timeout(Duration::from_secs(3))
                         .build()?;
 
-    let req = client.get("https://raw.githubusercontent.com/Nicbudd/unifetch/master/Cargo.toml")
-                        .build()?;
+    let url = "https://raw.githubusercontent.com/Nicbudd/unifetch/master/Cargo.toml";
+
+    let req = client.get(url).build()?;
     let resp = client.execute(req).await?;
     let body = resp.text().await?;
     
@@ -53,9 +54,10 @@ async fn latest_version() -> Result<String> {
 }
 
 
-use super::Args;
-pub async fn updates(args: &Args) {
-    if args.disable_update_notif {
+use crate::config::Modules;
+
+pub async fn updates(config: &Config) {
+    if !config.enabled_modules.contains(&Modules::Updates) {
         return;
     }
 

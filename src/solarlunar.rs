@@ -1,5 +1,6 @@
 use crate::common;
 use common::TermStyle::*;
+use crate::config::{Service, Config};
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -88,14 +89,25 @@ fn generate_solar_lunar_string(json: serde_json::Value) -> Result<String, String
     ))
 }    // dbg!(&r);
 
-use super::Args;
-pub async fn solar_lunar(args: &Args) {
+use crate::config::Modules;
 
-    if !args.solar_lunar {
+pub async fn solar_lunar(config: &Config) {
+
+    if !config.enabled_modules.contains(&Modules::SolarLunar) {
         return;
     }
 
     let mut s: String = common::title("SOLAR & LUNAR");
+
+    let coordinates_opt = config.localization
+        .get_coordinates(&Service::Usno);
+
+    if coordinates_opt.is_none() {
+        println!("{s}Coordinates not provided, cannot get solar/lunar times from unknown location\n");
+        return;
+    }
+
+    let coords_str = common::coords_str(coordinates_opt.unwrap());
 
     let now = Local::now();
 
@@ -104,7 +116,7 @@ pub async fn solar_lunar(args: &Args) {
     let mut map = HashMap::new();
 
     map.insert("date", now.format("%Y-%m-%d").to_string());
-    map.insert("coords", common::coords_str());
+    map.insert("coords", coords_str);
     map.insert("tz", tz_offset.to_string());
 
 
@@ -132,5 +144,5 @@ pub async fn solar_lunar(args: &Args) {
     }
 
 
-    println!("{}", s);
+    println!("{}\n", s);
 }

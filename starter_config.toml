@@ -1,0 +1,123 @@
+[general]
+
+# Enter coordinates in here (optional)
+# NOTE: to protect privacy, only the services you explicitly enable should be 
+# able to see these coordinates. There is some protection from coding errors
+# accidentally exposing your coordinates to the wrong service. All of the
+# modules are currently trusted, so security was not a concern while designing
+# the system.
+[localization]
+# NO GUARANTEES ARE MADE ABOUT THE PRIVACY OF YOUR COORDINATES. USE AT OWN RISK
+latitude = # in decimal
+longitude = # in decimal
+# Altitude (above mean sea level) follows same rules as coordinates.
+altitude = # in meters
+# Allow external services to see your coordinates. Uncomment to enable.
+allowed_services = # ["usno", "wxer", "usgs"]
+
+# Addresses for wxer, required for current conditions module.
+# unifetch will request these addresses in order, moving on if the address does
+# not respond.
+[wxer]
+addresses = ["http://localhost:6080"]
+
+[default_modules]
+standard = ["weather", "earthquake", "random", "solarlunar", "forecast"]
+verbose = ["weather", "earthquake", "random", "solarlunar", "tides", "forecast", 
+    "teleconnections"]
+extra_verbose = ["weather", "earthquake", "random", "solarlunar", "tides", 
+    "teleconnections", "forecast"]
+# all available modules:
+# ["earthquake", "forecast", "random", "solarlunar", "teleconnections", "tides", "weather"]
+
+
+
+[earthquakes]
+units = "mi"
+
+# Provides concentric rings of earthquake detection.
+[[earthquakes.local_search]]
+min_magnitude = 2
+radius = 50
+
+[[earthquakes.local_search]]
+min_magnitude = 4
+radius = 200
+
+[[earthquakes.local_search]]
+min_magnitude = 5
+radius = 500
+
+
+[teleconnections]
+values = ["enso", "nao"]
+# all possible values: ["enso", "nao"]
+
+
+# WEATHER SECTION
+
+# all available parameters:
+# ["apparent_temp", "cape", "clouds", "dewpoint","flight_rules", "height_500mb", 
+# "metar", "pressure", "rh", "temperature", "visibility", "wind", "wind_250mb",
+# "wx_code"]
+# The order the parameters are places are the order you will see them.
+# METAR is an exception. METAR will always appear at the end 
+[forecast.standard]
+parameters = ["flight_rules", "temp", "feels_like", "pres", "dew", "rh", "vis", 
+    "wind", "wxcode", "cloud"]
+hours = [0, 1, 2, 3, 6, 12, 18, 24, 48, 72, 96, 120]
+
+[forecast.verbose]
+parameters = ["flight_rules", "temp", "feels_like", "pres", "dew", "rh", "vis", 
+    "cape", "wind", "wxcode", "cloud", "250mb_wind", "500mb_height"]
+hours = [0, 1, 2, 3, 4, 6, 9, 12, 18, 24, 48, 72, 96, 120]
+
+[forecast.extra_verbose]
+parameters = ["flight_rules", "temp", "feels_like", "pres", "dew", "rh", "vis", 
+    "cape", "wind", "wxcode", "cloud", "250mb_wind", "500mb_height"]
+hours = [0, 1, 2, 3, 4, 5, 6, 9, 12, 18, 24, 30, 36, 42, 48, 56, 60, 66, 72, 84,
+    96, 108, 120, 132, 144]
+
+
+[weather.standard]
+parameters = ["flight_rules", "temp", "feels_like", "wxcode", "dew", "wind", 
+    "vis", "cloud", "pres", "metar"]
+
+[weather.verbose]
+parameters = ["flight_rules", "temp", "feels_like", "wxcode", "dew", "wind", 
+    "rh", "vis", "cloud", "pres", "250mb_wind", "500mb_height", "metar"]
+
+[weather.extra_verbose]
+parameters = ["flight_rules", "temp", "feels_like", "wxcode", "dew", "wind", 
+    "rh", "vis", "cloud", "pres", "250mb_wind", "500mb_height", "metar"]
+
+
+# tidal stations
+# use this to find station IDs 
+# https://tidesandcurrents.noaa.gov/tide_predictions.html
+
+# [[tides]]
+# id = 8429489
+# short_name = "HAMPTON"
+
+# [[tides]]
+# id = 8419870
+# short_name = "PORSMTH"
+
+# [[tides]]
+# id = 8421897
+# short_name = "DVR POINT"
+
+# [[tides]]
+# id = 8420411
+# short_name = "CCHECO R"
+
+# [[tides]]
+# id = 8422687
+# short_name = "SQMSCT RVR"
+
+# [[tides]]
+# id = 8427031
+# short_name = "ISLES SHLS"
+
+

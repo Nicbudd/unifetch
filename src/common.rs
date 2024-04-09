@@ -106,6 +106,11 @@ impl Style {
     pub fn error() -> String {
         Style::new(&[Red, Bold])
     }
+
+    #[allow(dead_code)]
+    pub fn warning() -> String {
+        Style::new(&[Yellow, Bold])
+    }
 }
 
 
@@ -121,7 +126,7 @@ pub fn terminal_line(c: char) -> String {
 // HELPER FUNCTIONS ------------------------------------------------------------
 
 pub fn title(s: &str) -> String {
-    format!("\n{:-^80}\n", s)
+    format!("{:-^80}\n", s)
 }
 
 pub async fn parse_request_loose_json(w: Result<reqwest::Response, reqwest::Error>) -> Result<serde_json::Value, String> {    
@@ -137,10 +142,10 @@ pub async fn parse_request_loose_json(w: Result<reqwest::Response, reqwest::Erro
 // CONFIG ----------------------------------------------------------------------
 
 // TODO: Do not hard code this.
-const COORDS: (f64, f64) = DURHAM_COORDS;
-const DURHAM_COORDS: (f64, f64) = (43.13, -70.92);
+// const COORDS: (f64, f64) = DURHAM_COORDS;
+// const DURHAM_COORDS: (f64, f64) = (43.13, -70.92);
 
-pub fn coords_str() -> String {
-    format!("{:.2},{:.2}", COORDS.0, COORDS.1)
+pub fn coords_str(coords: (f32, f32)) -> String {
+    format!("{:.2},{:.2}", coords.0, coords.1)
 }
 
