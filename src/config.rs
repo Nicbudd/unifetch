@@ -102,6 +102,7 @@ impl Localization {
             return None;
         }
     }
+    #[allow(dead_code)]
     pub fn get_altitude(&self, service: &Service) -> Option<f32> {
         if self.allowed_services.contains(service) {
             return self.altitude;
@@ -121,7 +122,7 @@ pub struct GeneralConfig {
     // intentionally left blank for now
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum Teleconnections {
     Enso,
@@ -140,6 +141,7 @@ pub enum DistanceUnits {
     #[serde(alias = "nmi", alias = "nauts")]
     NauticalMiles,
 }
+// todo: add global unit configuration
 
 #[derive(Debug, Deserialize)]
 pub struct EarthquakeRadii {
@@ -250,6 +252,7 @@ pub struct ForecastConfig {
 #[derive(Debug, Deserialize, Default, Clone)]
 pub struct ConditionsVerboseParams {
     pub parameters: Vec<WxParams>,
+    pub sources: Vec<String>,
     // pub hours: Vec<u32>
 
     // sources: Vec<WxSourceOptions>,
@@ -269,6 +272,11 @@ pub struct ConditionsConfig {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct TeleconnectionsConfig {
+    pub values: HashSet<Teleconnections> 
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     #[serde(skip_serializing)]
     pub localization: Localization,
@@ -277,8 +285,8 @@ pub struct Config {
     
     pub wxer: Wxer,
     
-    pub current_weather: ConditionsConfig,
-    pub teleconnections: Vec<Teleconnections>,
+    pub weather: ConditionsConfig,
+    pub teleconnections: TeleconnectionsConfig,
     pub tides: Vec<tides::TidalStation>,
     pub earthquakes: Earthquakes,
     pub forecast: ForecastConfig,
@@ -309,15 +317,15 @@ pub fn read_config_file(args: &Args) -> Result<Config> {
     match args.verbose {
         0 => {
             config.forecast.selected = config.forecast.standard.clone();
-            config.current_weather.selected = config.current_weather.standard.clone();
+            config.weather.selected = config.weather.standard.clone();
         }
         1 => {
             config.forecast.selected = config.forecast.verbose.clone();
-            config.current_weather.selected = config.current_weather.verbose.clone();
+            config.weather.selected = config.weather.verbose.clone();
         }
         2 => {
             config.forecast.selected = config.forecast.extra_verbose.clone();
-            config.current_weather.selected = config.current_weather.extra_verbose.clone();
+            config.weather.selected = config.weather.extra_verbose.clone();
         }
         _ => unreachable!()
     }

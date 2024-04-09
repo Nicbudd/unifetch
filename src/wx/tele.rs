@@ -180,12 +180,12 @@ fn format_nao(nao: BTreeMap<NaiveDate, f32>) -> Result<String, String>{
 async fn teleconnections_handler(config: &Config) -> Result<String, String>  {
     let mut s = common::title("TELECONNECTIONS");
 
-    if config.teleconnections.contains(&Enso) {
+    if config.teleconnections.values.contains(&Enso) {
         let enso = get_enso().await?;
         s.push_str(&format_enso(enso)?);
     }
 
-    if config.teleconnections.contains(&Nao) {
+    if config.teleconnections.values.contains(&Nao) {
         let nao: BTreeMap<NaiveDate, f32> = get_nao().await?;
         s.push_str(&format_nao(nao)?);
     }
