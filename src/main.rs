@@ -60,6 +60,10 @@ pub struct Args {
     #[arg(short = 't')]
     tides: bool,
 
+    /// Calendar date, times around the world (sync).
+    #[arg(short = 'd')]
+    datetime: bool,
+
     /// Disables header
     #[arg(short = 'H', long)]
     disable_header: bool,

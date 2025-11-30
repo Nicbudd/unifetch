@@ -70,7 +70,7 @@ use wxer_lib::*;
 
 #[allow(dead_code)]
 fn rh_to_dewpoint(temp: f32, rh: f32) -> f32 {
-    let t_c = f_to_c(temp);
+    let t_c = formulae::f_to_c(temp);
     
     let beta = 17.62; // constant
     let lambda = 243.12; // degrees C
@@ -81,7 +81,7 @@ fn rh_to_dewpoint(temp: f32, rh: f32) -> f32 {
 
     let dp_c = (lambda*combined_term)/(beta-combined_term);
 
-    c_to_f(dp_c)
+    formulae::c_to_f(dp_c)
 }
 
 // impl UNHWxEntry {
