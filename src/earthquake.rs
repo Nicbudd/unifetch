@@ -3,7 +3,6 @@ use crate::config::DistanceUnits;
 use crate::config::Service;
 use common::TermStyle::*;
 use common::Style;
-use futures::future;
 use futures::future::try_join_all;
 use crate::config::Config;
 
@@ -341,8 +340,10 @@ async fn earthquake_handler(config: &Config) -> Result<String, String> {
     Ok(s)
 }
 
+use crate::config::Modules;
+
 pub async fn earthquakes(config: &Config) {
-    if !config.enabled_modules.earthquakes ||
+    if !config.enabled_modules.contains(&Modules::Earthquakes) ||
     (!config.earthquakes.enable_global && !config.earthquakes.enable_local) {
         return;
     }

@@ -3,14 +3,14 @@ use csv;
 use serde::Deserialize;
 
 use crate::wx::*;
-use crate::config::Config;
+use crate::config::{Config, Modules, Teleconnections::*};
 
 pub async fn teleconnections(config: &Config){
-    if !config.enabled_modules.teleconnections {
+    if !config.enabled_modules.contains(&Modules::Teleconnections) {
         return;
     }
 
-    match teleconnections_handler().await {
+    match teleconnections_handler(config).await {
         Ok(s) => {println!("{}", s)},
         Err(e) => {println!("{}{}", common::title("TELECONNECTIONS"), e)},
     }
@@ -177,17 +177,18 @@ fn format_nao(nao: BTreeMap<NaiveDate, f32>) -> Result<String, String>{
     Ok(format!("NAO: {}{:.2}{Reset}{trend} (7 days ago: {}{:.2}{Reset})\n", style_nao(*current.1), *current.1, style_nao(*seven_days_ago.1), *seven_days_ago.1))
 }
 
-async fn teleconnections_handler() -> Result<String, String>  {
+async fn teleconnections_handler(config: &Config) -> Result<String, String>  {
     let mut s = common::title("TELECONNECTIONS");
-    
-    let enso = get_enso().await?;
-    let nao: BTreeMap<NaiveDate, f32> = get_nao().await?;
 
-    // dbg!(&nao);
+    if config.teleconnections.values.contains(&Enso) {
+        let enso = get_enso().await?;
+        s.push_str(&format_enso(enso)?);
+    }
 
-    s.push_str(&format_enso(enso)?);
-    s.push_str(&format_nao(nao)?);
+    if config.teleconnections.values.contains(&Nao) {
+        let nao: BTreeMap<NaiveDate, f32> = get_nao().await?;
+        s.push_str(&format_nao(nao)?);
+    }
 
     Ok(s)
-
 }

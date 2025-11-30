@@ -205,7 +205,7 @@ fn day_of_week_style<T: TimeZone>(dt: &DateTime<T>) -> String {
 
 }
 
-async fn forecast_handler() -> Result<String, String> {
+async fn forecast_handler(config: &Config) -> Result<String, String> {
     let mut s = common::title("FORECAST");
 
     s.push_str("Weather data by Open-Meteo.com (https://open-meteo.com/)\n\n");
@@ -224,15 +224,8 @@ async fn forecast_handler() -> Result<String, String> {
 
     let mut included = BTreeMap::new();
 
-    for hours_from_now in [0, 1, 2, 3, 4, 5, 6, 9, 12, 18, 
-                            (24*1 + 0), (24*1 + 6), (24*1 + 12), (24*1 + 18),
-                            (24*2 + 0), (24*2 + 6), (24*2 + 12), (24*2 + 18),
-                            (24*3 + 0), (24*3 + 12),
-                            (24*4 + 0), (24*4 + 12),
-                            (24*5 + 0), (24*5 + 12),
-                            (24*6 + 0), (24*6 + 12),
-                            (24*7 + 0), (24*7 + 12)] {
-        let dt = now + chrono::Duration::hours(hours_from_now);
+    for hours_from_now in &config.forecast.selected.hours {
+        let dt = now + chrono::Duration::hours(hours_from_now.clone() as i64);
         
         let entry_idx = entries.binary_search_by(|x| x.date_time.cmp(&dt));
         let entry_idx = match entry_idx {
@@ -256,19 +249,25 @@ async fn forecast_handler() -> Result<String, String> {
         let day_of_week_style = day_of_week_style(&local_dt);
 
         let prelude = format!("{day_of_week_style}{}{Reset} {}:", local_dt.format("%a"), local_dt.format("%d %l%p"));
-        s.push_str(&station_line(&prelude, entry,  false, &BTreeMap::new())?);
+        
+        s.push_str(&station_line(
+            &prelude, entry, &config.forecast.selected.parameters, 
+            false, &BTreeMap::new())?
+        );
     }
 
 
     Ok(s)
 }
 
+use crate::config::Modules;
+
 pub async fn forecast(config: &Config) {
-    if !config.enabled_modules.forecast {
+    if !config.enabled_modules.contains(&Modules::Forecast) {
         return;
     }
 
-    match forecast_handler().await {
+    match forecast_handler(config).await {
         Ok(s) => {println!("{}", s)},
         Err(e) => {println!("{}{}", common::title("FORECAST"), e)},
     }

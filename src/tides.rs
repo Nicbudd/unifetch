@@ -16,8 +16,10 @@ pub struct TidalStation {
     short_name: String
 }
 
+use crate::config::Modules;
+
 pub async fn tides(config: &Config){
-    if !config.enabled_modules.tides {
+    if !config.enabled_modules.contains(&Modules::Tides) {
         return;
     }
 

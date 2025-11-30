@@ -89,9 +89,11 @@ fn generate_solar_lunar_string(json: serde_json::Value) -> Result<String, String
     ))
 }    // dbg!(&r);
 
+use crate::config::Modules;
+
 pub async fn solar_lunar(config: &Config) {
 
-    if !config.enabled_modules.solarlunar {
+    if !config.enabled_modules.contains(&Modules::SolarLunar) {
         return;
     }
 
@@ -142,5 +144,5 @@ pub async fn solar_lunar(config: &Config) {
     }
 
 
-    println!("{}", s);
+    println!("{}\n", s);
 }

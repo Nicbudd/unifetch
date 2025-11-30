@@ -67,6 +67,10 @@ pub struct Args {
     /// Disables the update notification section. Update checking is asynchronous
     #[arg(short = 'u', long)]
     disable_update_notif: bool,
+
+    /// Add up to 2 v's to add details. Currently only for wx data.
+    #[arg(short = 'v', long, action = clap::ArgAction::Count)]
+    verbose: u8,
 }
 
 
@@ -74,7 +78,17 @@ pub struct Args {
 async fn main() {
 
     // parse args
-    let args = Args::parse();
+    let mut args = Args::parse();
+
+    // modify args
+    if args.verbose > 2 {
+        args.verbose = 2;
+    }
+
+    // set args to default if there are no other modules explicitly enabled.
+    args.default |= !(args.random || args.solar_lunar || args.current_conditions 
+        || args.forecast || args.teleconnections || args.earthquakes || 
+        args.tides);
 
     // open config file
     let config_opt = config::read_config_file(&args);
@@ -89,12 +103,12 @@ async fn main() {
 
     // actually start doing stuff
 
-    // sync functions
     if !args.disable_header {
         header();
     }
-
-    if args.random {
+    
+    // sync functions
+    if config.enabled_modules.contains(&config::Modules::Random) {
         random::random_section();
     }
 
@@ -104,7 +118,7 @@ async fn main() {
 
         solarlunar::solar_lunar(&config), 
 
-        wx::conditions::current_conditions(&config),
+        wx::weather::current_conditions(&config),
         wx::forecast::forecast(&config),
         wx::tele::teleconnections(&config),
 

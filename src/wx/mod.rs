@@ -1,5 +1,5 @@
 pub mod forecast;
-pub mod conditions;
+pub mod weather;
 pub mod tele;
 
 use crate::common;
@@ -16,7 +16,7 @@ use wxer_lib::*;
 
 // WEATHER DATA ------------------------------------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct WeatherData {
     title: String,
     text: String,
@@ -582,6 +582,32 @@ fn format_250mb_wind(e: &WxEntry) -> WeatherData {
     return WeatherData::none();
 }
 
+fn format_cape(e: &WxEntry) -> WeatherData {
+    if let Some(cape) = e.cape {
+        let style = if cape < 200. {
+            Style::new(&[])
+        } else if cape < 1000. {
+            Style::new(&[Bold])
+        } else if cape < 2000. {
+            Style::new(&[Blue, Bold])
+        } else if cape < 3000. {
+            Style::new(&[YellowBg, Black, Bold])
+        } else if cape < 4000. {
+            Style::new(&[RedBg, Black, Bold])
+        } else if cape < 5000. {
+            Style::new(&[PurpleBg, Black, Bold])
+        } else if cape < 6000. {
+            Style::new(&[PurpleBg, White, Bold])
+        } else {
+            Style::new(&[RedBg, White, Bold])
+        };
+ 
+        WeatherData{title: "CAPE".into(), text: format!("{cape:.0}"), style}
+    } else {
+        WeatherData::none()
+    }
+}
+
 
 #[derive(Copy, Clone, Debug)]
 enum FlightRules {
@@ -620,7 +646,7 @@ fn format_flight_rules(e: &WxEntry) -> WeatherData {
     
     let mut ceiling_height = u32::MAX;
 
-    let near_surface = e.layers.get(&Layer::Indoor);
+    let near_surface = e.layers.get(&Layer::NearSurface);
     let visibility = near_surface.map(|x| x.visibility).flatten();
 
     if let (Some(cover), Some(vis)) = (&e.skycover, visibility) {
@@ -660,59 +686,65 @@ fn format_flight_rules(e: &WxEntry) -> WeatherData {
 
 const COLUMN_WIDTH: usize = 80;
 
+use crate::config::WxParams;
+
+pub fn station_line(prelude: &str, e: &WxEntry, parameters: &Vec<WxParams>,
+    indoor: bool, db: &BTreeMap<DateTime<Utc>, WxEntry>) -> Result<String, String> {
+  
+    let mut data_vec: Vec<WeatherData> = vec![];
+
+    let mut total_string = String::new();
+
+    let (dewpoint, rh) = format_dewpoint(e);
+
+    for p in parameters {
+        match p {
+            WxParams::ApparentTemp => data_vec.push(format_apparent_temp(e)),
+            WxParams::Cape => data_vec.push(format_cape(e)),
+            WxParams::Cloud => data_vec.push(format_cloud(e)),
+            WxParams::Dewpoint => data_vec.push(dewpoint.clone()),
+            WxParams::FlightRules => data_vec.push(format_flight_rules(e)),
+            WxParams::Height500mb => data_vec.push(format_500mb_height(e)),
+            WxParams::Metar => {}, // METARs are dealt with separately at the end
+            WxParams::Pressure => data_vec.push(format_pressure(e, db)),
+            WxParams::RelativeHumidity => data_vec.push(rh.clone()),
+            WxParams::Temperature => data_vec.push(format_temp(e, indoor, db)),
+            WxParams::Visibility => data_vec.push(format_visibility(e)),
+            WxParams::Wind => data_vec.push(format_wind(e)),
+            WxParams::Wind250mb => data_vec.push(format_250mb_wind(e)),
+            WxParams::WxCode => data_vec.push(format_wx(e.present_wx.clone())),
+        }
+    }
 
 
+    total_string.push_str(prelude);
 
+    let mut line_length = total_string.len();
 
+    for data in data_vec {
+        let new_len = line_length + 1 + data.len();
+        
+        // dbg!(&data, data.len(), new_len);
 
+        if data.is_none() {
+            continue;
+        } else if new_len <= COLUMN_WIDTH {
+            total_string.push(' ');
+            total_string.push_str(&data.to_string());
+            line_length = new_len;
+        } else {
+            total_string.push_str("\n  ");
+            total_string.push_str(&data.to_string());
+            line_length = 2 + data.len();
+        };
+    }
 
-pub fn station_line(prelude: &str, e: &WxEntry, indoor: bool,
-    db: &BTreeMap<DateTime<Utc>, WxEntry>) -> Result<String, String> {
-  
-      let mut string_vec: Vec<WeatherData> = vec![];
-  
-      let mut total_string = String::new();
-  
-      let (dewpoint, rh) = format_dewpoint(e);
-  
-      string_vec.push(format_flight_rules(e));
-      string_vec.push(format_temp(e, indoor, db));
-      string_vec.push(format_apparent_temp(e));
-      string_vec.push(format_pressure(e, db));
-      string_vec.push(dewpoint);
-      string_vec.push(rh);
-      string_vec.push(format_visibility(e));
-      string_vec.push(format_wx(e.present_wx.clone()));
-      string_vec.push(format_wind(e));
-      string_vec.push(format_250mb_wind(e));
-      string_vec.push(format_cloud(e));
-      string_vec.push(format_500mb_height(e));
-  
-      total_string.push_str(prelude);
-  
-      let mut line_length = total_string.len();
-  
-      for data in string_vec {
-          let new_len = line_length + 1 + data.len();
-          
-          // dbg!(&data, data.len(), new_len);
-  
-          if data.is_none() {
-              continue;
-          } else if new_len <= COLUMN_WIDTH {
-              total_string.push(' ');
-              total_string.push_str(&data.to_string());
-              line_length = new_len;
-          } else {
-              total_string.push_str("\n  ");
-              total_string.push_str(&data.to_string());
-              line_length = 2 + data.len();
-          };
-      }
-  
-      total_string.push_str(&format_metar(e));
-      
-      total_string.push('\n');
-  
-      Ok(total_string)
-  }
+    if parameters.contains(&WxParams::Metar) {
+        total_string.push_str(&format_metar(e));
+    }
+
+    
+    total_string.push('\n');
+
+    Ok(total_string)
+}
