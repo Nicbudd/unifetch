@@ -138,7 +138,7 @@ fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<WxEntry> {
         let mut weather = vec![];
         if rain > 0. {weather.push("RA".into())};
         if snow > 0. {weather.push("SN".into())};
-        let present_wx = Some(weather);
+        let wx_codes = Some(weather);
 
         let mut layers = HashMap::new();
 
@@ -152,6 +152,12 @@ fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<WxEntry> {
             wind_direction,
             wind_speed,
             visibility,
+            apparent_temp: None,
+            heat_index: None, 
+            relative_humidity: None,
+            slp: None, 
+            wind_chill: None, 
+            theta_e: None,
         };
 
         let mut sea_level = WxEntryLayer::empty(Layer::SeaLevel);
@@ -169,7 +175,7 @@ fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<WxEntry> {
         layers.insert(Layer::MBAR(250), layer_250mb);
 
 
-        let e = WxEntry {
+        let mut e = WxEntry {
             date_time: date_time.clone(),
             station: psm_station.clone(),
 
@@ -177,12 +183,18 @@ fn open_meteo_to_entries(open_meteo: OpenMeteoResponse) -> Vec<WxEntry> {
 
             cape: Some(hourly.cape[idx]),
             skycover: None,
-            present_wx,
+            wx_codes,
             raw_metar: None,
             precip,
             precip_probability: Some(hourly.precip_probability[idx]),
             precip_today: None,
+
+            wx: None,
+            altimeter: None,
+            best_slp: None,
         };
+
+        e.fill_in_calculated_values();
 
         entries.push(e);
     }

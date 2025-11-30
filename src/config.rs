@@ -1,9 +1,11 @@
 use std::collections::HashSet;
 use std::fs;
+use std::str::FromStr;
 
 use super::Args;
 
-use anyhow::{self, Context, Result};
+use anyhow::{Context, Result};
+use chrono_tz::Tz;
 use home::home_dir;
 use serde::Deserialize;
 use serde;
@@ -18,6 +20,9 @@ fn t() -> bool {
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum Modules {
+    #[serde(alias = "dt", alias = "date", alias = "time", alias = "date_time")]
+    DateTime,
+
     #[serde(alias = "currentconditions", alias = "current_conditions",
         alias = "conditions", 
         alias = "analysis",
@@ -276,6 +281,19 @@ pub struct TeleconnectionsConfig {
     pub values: HashSet<Teleconnections> 
 }
 
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq, Hash)]
+pub struct ConfigTimezone {
+    iana_name: String,
+    pub name: Option<String>,
+    #[serde(skip)]
+    pub tz: Tz
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DateTimeConfig {
+    timezones: Vec<ConfigTimezone>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Config {
     #[serde(skip_serializing)]
@@ -290,6 +308,7 @@ pub struct Config {
     pub tides: Vec<tides::TidalStation>,
     pub earthquakes: Earthquakes,
     pub forecast: ForecastConfig,
+    pub datetime: DateTimeConfig,
 
     default_modules: DefaultModules,
     #[serde(skip)]
@@ -338,8 +357,19 @@ pub fn read_config_file(args: &Args) -> Result<Config> {
     if args.teleconnections {config.enabled_modules.insert(Modules::Teleconnections);}
     if args.earthquakes {config.enabled_modules.insert(Modules::Earthquakes);}
     if args.tides {config.enabled_modules.insert(Modules::Tides);}
+    if args.datetime {config.enabled_modules.insert(Modules::DateTime);}
+
 
     if !args.disable_update_notif {config.enabled_modules.insert(Modules::Updates);}
+
+    // parse timezones
+    let tzs = config.datetime.timezones.iter().map(|t| {
+        let mut l = t.clone();
+        l.tz = Tz::from_str(&t.iana_name)?;
+        return Ok::<ConfigTimezone, chrono_tz::ParseError>(l);
+    }).collect::<Result<Vec<ConfigTimezone>, chrono_tz::ParseError>>()?;
+    
+    config.datetime.timezones = tzs;
 
     Ok(config)
 }

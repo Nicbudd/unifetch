@@ -260,7 +260,7 @@ fn format_dewpoint(e: &WxEntry) -> (WeatherData, WeatherData) {
 
     let rh_text: String;
     let rh_style: String;
-    let rh = near_surface.map(|x| x.relative_humidity_2m()).flatten();
+    let rh = near_surface.map(|x| x.relative_humidity).flatten();
 
     match rh {
         Some(a) => {
@@ -712,7 +712,7 @@ pub fn station_line(prelude: &str, e: &WxEntry, parameters: &Vec<WxParams>,
             WxParams::Visibility => data_vec.push(format_visibility(e)),
             WxParams::Wind => data_vec.push(format_wind(e)),
             WxParams::Wind250mb => data_vec.push(format_250mb_wind(e)),
-            WxParams::WxCode => data_vec.push(format_wx(e.present_wx.clone())),
+            WxParams::WxCode => data_vec.push(format_wx(e.wx_codes.clone())),
         }
     }
 

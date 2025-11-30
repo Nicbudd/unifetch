@@ -7,13 +7,13 @@
 # modules are currently trusted, so security was not a concern while designing
 # the system.
 [localization]
-# NO GUARANTEES ARE MADE ABOUT THE PRIVACY OF YOUR COORDINATES. USE AT OWN RISK
-latitude = # in decimal
-longitude = # in decimal
-# Altitude (above mean sea level) follows same rules as coordinates.
-altitude = # in meters
-# Allow external services to see your coordinates. Uncomment to enable.
-allowed_services = # ["usno", "wxer", "usgs"]
+    # NO GUARANTEES ARE MADE ABOUT THE PRIVACY OF YOUR COORDINATES. USE AT OWN RISK
+# latitude = # in decimal
+# longitude = # in decimal
+    # Altitude (above mean sea level) follows same rules as coordinates.
+# altitude = # in meters
+    # Allow external services to see your coordinates.
+allowed_services = [] # ["usno", "wxer", "usgs"]
 
 # Addresses for wxer, required for current conditions module.
 # unifetch will request these addresses in order, moving on if the address does
@@ -22,15 +22,20 @@ allowed_services = # ["usno", "wxer", "usgs"]
 addresses = ["http://localhost:6080"]
 
 [default_modules]
-standard = ["weather", "earthquake", "random", "solarlunar", "forecast"]
-verbose = ["weather", "earthquake", "random", "solarlunar", "tides", "forecast", 
+standard = ["datetime", "weather", "earthquake", "random", "solarlunar", "forecast"]
+verbose = ["datetime", "weather", "earthquake", "random", "solarlunar", "tides", "forecast", 
     "teleconnections"]
-extra_verbose = ["weather", "earthquake", "random", "solarlunar", "tides", 
+extra_verbose = ["datetime", "weather", "earthquake", "random", "solarlunar", "tides", 
     "teleconnections", "forecast"]
 # all available modules:
-# ["earthquake", "forecast", "random", "solarlunar", "teleconnections", "tides", "weather"]
+# ["datetime", "earthquake", "forecast", "random", "solarlunar", "teleconnections", "tides", "weather"]
 
 
+[datetime]
+
+[[datetime.timezones]]
+iana_name = "America/New_York"
+name = "EST"
 
 [earthquakes]
 units = "mi"
