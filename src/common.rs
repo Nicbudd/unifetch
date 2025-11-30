@@ -62,10 +62,9 @@ impl fmt::Display for TermStyle {
     }
 }
 
-
 use TermStyle::*;
 
-// TODO: Maybe not make this a struct? 
+// TODO: Maybe not make this a struct?
 pub struct Style {
     // styles: Vec<TermStyle>
 }
@@ -107,11 +106,11 @@ impl Style {
         Style::new(&[Red, Bold])
     }
 
+    #[allow(dead_code)]
     pub fn warning() -> String {
         Style::new(&[Yellow, Bold])
     }
 }
-
 
 pub fn terminal_line(c: char) -> String {
     let mut s = String::new();
@@ -125,18 +124,18 @@ pub fn terminal_line(c: char) -> String {
 // HELPER FUNCTIONS ------------------------------------------------------------
 
 pub fn title(s: &str) -> String {
-    format!("\n{:-^80}\n", s)
+    format!("{:-^80}\n", s)
 }
 
-pub async fn parse_request_loose_json(w: Result<reqwest::Response, reqwest::Error>) -> Result<serde_json::Value, String> {    
+pub async fn parse_request_loose_json(
+    w: Result<reqwest::Response, reqwest::Error>,
+) -> Result<serde_json::Value, String> {
     let r = w.map_err(|e| e.to_string())?;
     let t = r.text().await.map_err(|e| e.to_string())?;
     // dbg!(&t);
     let j = serde_json::from_str(&t).map_err(|e| e.to_string())?;
     Ok(j)
 }
-
-
 
 // CONFIG ----------------------------------------------------------------------
 
@@ -147,4 +146,3 @@ pub async fn parse_request_loose_json(w: Result<reqwest::Response, reqwest::Erro
 pub fn coords_str(coords: (f32, f32)) -> String {
     format!("{:.2},{:.2}", coords.0, coords.1)
 }
-

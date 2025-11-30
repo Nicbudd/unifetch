@@ -103,12 +103,12 @@ async fn main() {
 
     // actually start doing stuff
 
-    // sync functions
     if !args.disable_header {
         header();
     }
-
-    if args.random {
+    
+    // sync functions
+    if config.enabled_modules.contains(&config::Modules::Random) {
         random::random_section();
     }
 
@@ -118,7 +118,7 @@ async fn main() {
 
         solarlunar::solar_lunar(&config), 
 
-        wx::conditions::current_conditions(&config),
+        wx::weather::current_conditions(&config),
         wx::forecast::forecast(&config),
         wx::tele::teleconnections(&config),
 

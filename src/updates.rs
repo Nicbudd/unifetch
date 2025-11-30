@@ -36,8 +36,9 @@ async fn latest_version() -> Result<String> {
                         .timeout(Duration::from_secs(3))
                         .build()?;
 
-    let req = client.get("https://raw.githubusercontent.com/Nicbudd/unifetch/master/Cargo.toml")
-                        .build()?;
+    let url = "https://raw.githubusercontent.com/Nicbudd/unifetch/master/Cargo.toml";
+
+    let req = client.get(url).build()?;
     let resp = client.execute(req).await?;
     let body = resp.text().await?;
     

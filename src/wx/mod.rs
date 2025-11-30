@@ -1,5 +1,5 @@
 pub mod forecast;
-pub mod conditions;
+pub mod weather;
 pub mod tele;
 
 use crate::common;
@@ -646,7 +646,7 @@ fn format_flight_rules(e: &WxEntry) -> WeatherData {
     
     let mut ceiling_height = u32::MAX;
 
-    let near_surface = e.layers.get(&Layer::Indoor);
+    let near_surface = e.layers.get(&Layer::NearSurface);
     let visibility = near_surface.map(|x| x.visibility).flatten();
 
     if let (Some(cover), Some(vis)) = (&e.skycover, visibility) {
@@ -699,20 +699,20 @@ pub fn station_line(prelude: &str, e: &WxEntry, parameters: &Vec<WxParams>,
 
     for p in parameters {
         match p {
-            WxParams::FlightRules => data_vec.push(format_flight_rules(e)),
-            WxParams::Temperature => data_vec.push(format_temp(e, indoor, db)),
             WxParams::ApparentTemp => data_vec.push(format_apparent_temp(e)),
-            WxParams::Pressure => data_vec.push(format_pressure(e, db)),
+            WxParams::Cape => data_vec.push(format_cape(e)),
+            WxParams::Cloud => data_vec.push(format_cloud(e)),
             WxParams::Dewpoint => data_vec.push(dewpoint.clone()),
+            WxParams::FlightRules => data_vec.push(format_flight_rules(e)),
+            WxParams::Height500mb => data_vec.push(format_500mb_height(e)),
+            WxParams::Metar => {}, // METARs are dealt with separately at the end
+            WxParams::Pressure => data_vec.push(format_pressure(e, db)),
             WxParams::RelativeHumidity => data_vec.push(rh.clone()),
+            WxParams::Temperature => data_vec.push(format_temp(e, indoor, db)),
             WxParams::Visibility => data_vec.push(format_visibility(e)),
-            WxParams::WxCode => data_vec.push(format_wx(e.present_wx.clone())),
             WxParams::Wind => data_vec.push(format_wind(e)),
             WxParams::Wind250mb => data_vec.push(format_250mb_wind(e)),
-            WxParams::Cloud => data_vec.push(format_cloud(e)),
-            WxParams::Height500mb => data_vec.push(format_500mb_height(e)),
-            WxParams::Cape => data_vec.push(format_cape(e)),
-            WxParams::Metar => {},
+            WxParams::WxCode => data_vec.push(format_wx(e.present_wx.clone())),
         }
     }
 
