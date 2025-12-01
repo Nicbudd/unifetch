@@ -70,7 +70,7 @@ pub struct Style {
 }
 
 impl Style {
-    pub fn new(styles: &[TermStyle]) -> String {
+    pub fn string(styles: &[TermStyle]) -> String {
         let mut nums = vec![];
 
         for s in styles {
@@ -103,12 +103,12 @@ impl Style {
     }
 
     pub fn error() -> String {
-        Style::new(&[Red, Bold])
+        Style::string(&[Red, Bold])
     }
 
     #[allow(dead_code)]
     pub fn warning() -> String {
-        Style::new(&[Yellow, Bold])
+        Style::string(&[Yellow, Bold])
     }
 }
 

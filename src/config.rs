@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::str::FromStr;
 
@@ -8,7 +8,6 @@ use anyhow::{Context, Result};
 use chrono_tz::Tz;
 use home::home_dir;
 use serde::Deserialize;
-use serde;
 
 use crate::tides;
 
@@ -23,38 +22,39 @@ pub enum Modules {
     #[serde(alias = "dt", alias = "date", alias = "time", alias = "date_time")]
     DateTime,
 
-    #[serde(alias = "currentconditions", alias = "current_conditions",
-        alias = "conditions", 
+    #[serde(
+        alias = "currentconditions",
+        alias = "current_conditions",
+        alias = "conditions",
         alias = "analysis",
         alias = "weather",
         alias = "wx",
         alias = "wxer",
-        alias = "current_weather", alias = "currentweather")]
+        alias = "current_weather",
+        alias = "currentweather"
+    )]
     CurrentConditions,
 
-    #[serde(alias = "forecast", 
-        alias = "future_weather", 
+    #[serde(
+        alias = "forecast",
+        alias = "future_weather",
         alias = "futurecast",
-        alias = "futurewx")]
+        alias = "futurewx"
+    )]
     Forecast,
 
-    #[serde(alias = "tele", 
-        alias = "nao", 
-        alias = "enso")]
+    #[serde(alias = "tele", alias = "nao", alias = "enso")]
     Teleconnections,
 
-    #[serde(alias = "quake", 
-        alias = "quakes", 
-        alias = "earthquake",)]
+    #[serde(alias = "quake", alias = "quakes", alias = "earthquake")]
     Earthquakes,
 
-    #[serde(alias = "rand", 
-        alias = "dice", 
-        alias = "randomize",)]
+    #[serde(alias = "rand", alias = "dice", alias = "randomize")]
     Random,
 
-    #[serde(alias = "solar", 
-        alias = "lunar", 
+    #[serde(
+        alias = "solar",
+        alias = "lunar",
         alias = "sunrise",
         alias = "sunset",
         alias = "moonrise",
@@ -62,13 +62,16 @@ pub enum Modules {
         alias = "moonphase",
         alias = "riseset",
         alias = "daylight",
-        alias = "sunandmoon",)]
+        alias = "sunandmoon"
+    )]
     SolarLunar,
 
-    #[serde(alias = "tidal",
+    #[serde(
+        alias = "tidal",
         alias = "tide",
         alias = "tidechart",
-        alias = "tidecharts")]
+        alias = "tidecharts"
+    )]
     Tides,
 
     #[serde(skip)]
@@ -96,33 +99,35 @@ pub struct Localization {
 
 impl Localization {
     // this function allows services to access the coordinates
-    // it's not secure and is easy to "fool", but all of the modules are 
+    // it's not secure and is easy to "fool", but all of the modules are
     // isolated and trusted for now.
     pub fn get_coordinates(&self, service: &Service) -> Option<(f32, f32)> {
-        if self.allowed_services.contains(service) &&
-            self.latitude.is_some() && self.longitude.is_some() {
-            return Some((self.latitude.unwrap(), self.longitude.unwrap()));
-
+        if self.allowed_services.contains(service)
+            && self.latitude.is_some()
+            && self.longitude.is_some()
+        {
+            Some((self.latitude.unwrap(), self.longitude.unwrap()))
         } else {
-            return None;
+            None
         }
     }
     #[allow(dead_code)]
     pub fn get_altitude(&self, service: &Service) -> Option<f32> {
         if self.allowed_services.contains(service) {
-            return self.altitude;
+            self.altitude
         } else {
-            return None;
+            None
         }
     }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Wxer {
-    pub addresses: Vec<String>
+    pub addresses: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct GeneralConfig {
     // intentionally left blank for now
 }
@@ -161,10 +166,10 @@ pub struct Earthquakes {
 
     #[serde(default = "t")]
     pub enable_local: bool, // must allow USGS to access coordinates
-    
+
     #[serde(default = "t")]
     pub enable_global: bool,
-    
+
     #[serde(default)]
     pub local_search: Vec<EarthquakeRadii>,
 }
@@ -183,14 +188,25 @@ pub enum WxParams {
     #[serde(alias = "IFR", alias = "VFR", alias = "flight_rules")]
     FlightRules,
 
-    #[serde(alias = "temp", alias = "2m_temperature", alias = "temperature_2m", 
-    alias = "outdoor_temp", alias = "outdoortemp")]
+    #[serde(
+        alias = "temp",
+        alias = "2m_temperature",
+        alias = "temperature_2m",
+        alias = "outdoor_temp",
+        alias = "outdoortemp"
+    )]
     Temperature,
 
-    #[serde(alias = "feels_like", alias = "feelslike", alias = "feels",
-    alias = "apparent_temp",
-    alias = "heatindex", alias = "heat_index", 
-    alias = "windchill", alias = "wind_chill")]
+    #[serde(
+        alias = "feels_like",
+        alias = "feelslike",
+        alias = "feels",
+        alias = "apparent_temp",
+        alias = "heatindex",
+        alias = "heat_index",
+        alias = "windchill",
+        alias = "wind_chill"
+    )]
     ApparentTemp,
 
     #[serde(alias = "pres", alias = "mslp", alias = "slp")]
@@ -205,27 +221,59 @@ pub enum WxParams {
     #[serde(alias = "vis")]
     Visibility,
 
-    #[serde(alias = "wx_codes", alias = "wx_code", alias = "wxcodes",
-    alias = "weather", 
-    alias = "weather_code", alias = "code",)]
+    #[serde(
+        alias = "wx_codes",
+        alias = "wx_code",
+        alias = "wxcodes",
+        alias = "weather",
+        alias = "weather_code",
+        alias = "code"
+    )]
     WxCode,
 
-    #[serde(alias = "250mb_wind", alias = "250mbwind", alias = "250mb_winds", alias = "250mbwinds",
-    alias = "250hpa_wind", alias = "250hpawind", alias = "250hpa_winds", alias = "250hpawinds",
-    alias = "jetstream", alias = "jetstreak",
-    alias = "upper_level_wind", alias = "upper_level_winds", 
-    alias = "upper_level_windspeed", alias = "upper_level_wind_speed")]
+    #[serde(
+        alias = "250mb_wind",
+        alias = "250mbwind",
+        alias = "250mb_winds",
+        alias = "250mbwinds",
+        alias = "250hpa_wind",
+        alias = "250hpawind",
+        alias = "250hpa_winds",
+        alias = "250hpawinds",
+        alias = "jetstream",
+        alias = "jetstreak",
+        alias = "upper_level_wind",
+        alias = "upper_level_winds",
+        alias = "upper_level_windspeed",
+        alias = "upper_level_wind_speed"
+    )]
     Wind250mb,
 
-    #[serde(alias = "500mb_height", alias = "500mbheight", alias = "500mbhght",
-    alias = "500mb_geopotential_height", alias = "500mb_geopot_height",
-    alias = "500hpa_height", alias = "500hpaheight", alias = "500hpahght",
-    alias = "500hpa_geopotential_height", alias = "500hpa_geopot_height",
-    alias = "troughs", alias = "trough", alias = "ridges", alias = "ridge")]
+    #[serde(
+        alias = "500mb_height",
+        alias = "500mbheight",
+        alias = "500mbhght",
+        alias = "500mb_geopotential_height",
+        alias = "500mb_geopot_height",
+        alias = "500hpa_height",
+        alias = "500hpaheight",
+        alias = "500hpahght",
+        alias = "500hpa_geopotential_height",
+        alias = "500hpa_geopot_height",
+        alias = "troughs",
+        alias = "trough",
+        alias = "ridges",
+        alias = "ridge"
+    )]
     Height500mb,
 
-    #[serde(alias = "wind", alias = "surface_wind", alias = "wind_speed",
-    alias = "10m_wind", alias = "windspeed")]
+    #[serde(
+        alias = "wind",
+        alias = "surface_wind",
+        alias = "wind_speed",
+        alias = "10m_wind",
+        alias = "windspeed"
+    )]
     Wind,
 
     #[serde(alias = "clouds", alias = "cloud_layers")]
@@ -241,7 +289,7 @@ pub enum WxParams {
 #[derive(Debug, Deserialize, Default, Clone)]
 pub struct ForecastVerboseParams {
     pub parameters: Vec<WxParams>,
-    pub hours: Vec<u32>
+    pub hours: Vec<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -260,14 +308,14 @@ pub struct ConditionsVerboseParams {
     pub sources: Vec<String>,
     // pub hours: Vec<u32>
 
-    // sources: Vec<WxSourceOptions>,
-
     // #[serde(skip)]
     // pub stations: Vec<WxConditionStation>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ConditionsConfig {
+    pub rename_stations: HashMap<String, String>,
+
     standard: ConditionsVerboseParams,
     verbose: ConditionsVerboseParams,
     extra_verbose: ConditionsVerboseParams,
@@ -278,7 +326,7 @@ pub struct ConditionsConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct TeleconnectionsConfig {
-    pub values: HashSet<Teleconnections> 
+    pub values: HashSet<Teleconnections>,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq, Hash)]
@@ -286,7 +334,7 @@ pub struct ConfigTimezone {
     iana_name: String,
     pub name: Option<String>,
     #[serde(skip)]
-    pub tz: Tz
+    pub tz: Tz,
 }
 
 #[derive(Debug, Deserialize)]
@@ -299,10 +347,9 @@ pub struct Config {
     #[serde(skip_serializing)]
     pub localization: Localization,
 
-    pub general: GeneralConfig,
-    
+    // pub general: GeneralConfig,
     pub wxer: Wxer,
-    
+
     pub weather: ConditionsConfig,
     pub teleconnections: TeleconnectionsConfig,
     pub tides: Vec<tides::TidalStation>,
@@ -318,20 +365,22 @@ pub struct Config {
 pub fn read_config_file(args: &Args) -> Result<Config> {
     let home_dir = home_dir().context("Could not find users home directory.")?;
     let config_location = home_dir
-        .join(".config").join("unifetch").join("config.toml");
-    
+        .join(".config")
+        .join("unifetch")
+        .join("config.toml");
+
     let mut config: Config = toml::from_str(&fs::read_to_string(config_location)?)?;
 
     // enable all default modules if we are running default.
     if args.default {
         // clone the default modules
         match args.verbose {
-            0 => {config.enabled_modules = config.default_modules.standard.clone()}
-            1 => {config.enabled_modules = config.default_modules.verbose.clone()}
-            2 => {config.enabled_modules = config.default_modules.extra_verbose.clone()}
-            _ => unreachable!()
+            0 => config.enabled_modules = config.default_modules.standard.clone(),
+            1 => config.enabled_modules = config.default_modules.verbose.clone(),
+            2 => config.enabled_modules = config.default_modules.extra_verbose.clone(),
+            _ => unreachable!(),
         }
-    } 
+    }
 
     match args.verbose {
         0 => {
@@ -346,29 +395,51 @@ pub fn read_config_file(args: &Args) -> Result<Config> {
             config.forecast.selected = config.forecast.extra_verbose.clone();
             config.weather.selected = config.weather.extra_verbose.clone();
         }
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 
     // set config enabled modules if arg explicitly enables it
-    if args.random {config.enabled_modules.insert(Modules::Random);}
-    if args.solar_lunar {config.enabled_modules.insert(Modules::SolarLunar);}
-    if args.current_conditions {config.enabled_modules.insert(Modules::CurrentConditions);}
-    if args.forecast {config.enabled_modules.insert(Modules::Forecast);}
-    if args.teleconnections {config.enabled_modules.insert(Modules::Teleconnections);}
-    if args.earthquakes {config.enabled_modules.insert(Modules::Earthquakes);}
-    if args.tides {config.enabled_modules.insert(Modules::Tides);}
-    if args.datetime {config.enabled_modules.insert(Modules::DateTime);}
+    if args.random {
+        config.enabled_modules.insert(Modules::Random);
+    }
+    if args.solar_lunar {
+        config.enabled_modules.insert(Modules::SolarLunar);
+    }
+    if args.current_conditions {
+        config.enabled_modules.insert(Modules::CurrentConditions);
+    }
+    if args.forecast {
+        config.enabled_modules.insert(Modules::Forecast);
+    }
+    if args.teleconnections {
+        config.enabled_modules.insert(Modules::Teleconnections);
+    }
+    if args.earthquakes {
+        config.enabled_modules.insert(Modules::Earthquakes);
+    }
+    if args.tides {
+        config.enabled_modules.insert(Modules::Tides);
+    }
+    if args.datetime {
+        config.enabled_modules.insert(Modules::DateTime);
+    }
 
-
-    if !args.disable_update_notif {config.enabled_modules.insert(Modules::Updates);}
+    if !args.disable_update_notif {
+        config.enabled_modules.insert(Modules::Updates);
+    }
 
     // parse timezones
-    let tzs = config.datetime.timezones.iter().map(|t| {
-        let mut l = t.clone();
-        l.tz = Tz::from_str(&t.iana_name)?;
-        return Ok::<ConfigTimezone, chrono_tz::ParseError>(l);
-    }).collect::<Result<Vec<ConfigTimezone>, chrono_tz::ParseError>>()?;
-    
+    let tzs = config
+        .datetime
+        .timezones
+        .iter()
+        .map(|t| {
+            let mut l = t.clone();
+            l.tz = Tz::from_str(&t.iana_name)?;
+            Ok(l)
+        })
+        .collect::<Result<Vec<ConfigTimezone>, chrono_tz::ParseError>>()?;
+
     config.datetime.timezones = tzs;
 
     Ok(config)

@@ -1,18 +1,16 @@
 mod common;
-mod solarlunar;
+mod config;
 mod earthquake;
 mod random;
-mod wx; 
-mod updates; 
+mod solarlunar;
 mod tides;
-mod config;
+mod updates;
+mod wx;
 
 use std::env;
 
-use clap::Parser;
 use chrono::{Local, Utc};
-use tokio;
-
+use clap::Parser;
 
 // HEAD MATTER -----------------------------------------------------------------
 
@@ -21,10 +19,12 @@ fn header() {
     let local_now = Local::now().format("%a %Y-%b-%d @ %I:%M:%S%p");
     let r = rand::random::<u32>();
 
-    println!("{}unifetch v{} {local_now} {utc_now} - {r:08X}", common::terminal_line('-'), env!("CARGO_PKG_VERSION"));
+    println!(
+        "{}unifetch v{} {local_now} {utc_now} - {r:08X}",
+        common::terminal_line('-'),
+        env!("CARGO_PKG_VERSION")
+    );
 }
-
-
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -39,14 +39,14 @@ pub struct Args {
     /// Sun/moon set/rise times (async).
     #[arg(short, long)]
     solar_lunar: bool,
-    
+
     /// Current weather conditions (async).
     #[arg(short = 'w', long)]
     current_conditions: bool,
 
     /// Provides forecast for the home location (async).
     #[arg(short = 'F', long)]
-    forecast: bool,    
+    forecast: bool,
 
     /// Grabs data about teleconnections (eg: El Nino Southern Oscillation, NAO) (async).
     #[arg(short = 'e', long)]
@@ -61,7 +61,7 @@ pub struct Args {
     tides: bool,
 
     /// Calendar date, times around the world (sync).
-    #[arg(short = 'd')]
+    #[arg(short = 'D')]
     datetime: bool,
 
     /// Disables header
@@ -77,10 +77,8 @@ pub struct Args {
     verbose: u8,
 }
 
-
-#[tokio::main] 
+#[tokio::main]
 async fn main() {
-
     // parse args
     let mut args = Args::parse();
 
@@ -90,16 +88,23 @@ async fn main() {
     }
 
     // set args to default if there are no other modules explicitly enabled.
-    args.default |= !(args.random || args.solar_lunar || args.current_conditions 
-        || args.forecast || args.teleconnections || args.earthquakes || 
-        args.tides);
+    args.default |= !(args.random
+        || args.solar_lunar
+        || args.current_conditions
+        || args.forecast
+        || args.teleconnections
+        || args.earthquakes
+        || args.tides);
 
     // open config file
     let config_opt = config::read_config_file(&args);
 
     if let Err(e) = config_opt {
-        println!("{}CONFIG FILE PARSING ERROR{}\n{e:?}", 
-            common::Style::error(), common::TermStyle::Reset);
+        println!(
+            "{}CONFIG FILE PARSING ERROR{}\n{e:?}",
+            common::Style::error(),
+            common::TermStyle::Reset
+        );
         return;
     }
 
@@ -110,7 +115,7 @@ async fn main() {
     if !args.disable_header {
         header();
     }
-    
+
     // sync functions
     if config.enabled_modules.contains(&config::Modules::Random) {
         random::random_section();
@@ -119,13 +124,10 @@ async fn main() {
     // async functions
     tokio::join!(
         updates::updates(&config),
-
-        solarlunar::solar_lunar(&config), 
-
+        solarlunar::solar_lunar(&config),
         wx::weather::current_conditions(&config),
         wx::forecast::forecast(&config),
         wx::tele::teleconnections(&config),
-
         // time_and_date();
 
         // obscure calendars/clocks
@@ -146,16 +148,7 @@ async fn main() {
         // kernel/os info?
 
         // astrology?
-
         tides::tides(&config),
-        
         earthquake::earthquakes(&config)
-
     );
-
-
-
 }
-
-
-
