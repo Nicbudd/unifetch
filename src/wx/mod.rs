@@ -775,6 +775,47 @@ fn format_flight_rules(e: &WxEntryStruct) -> WeatherData {
     }
 }
 
+fn format_comfort(e: &WxEntryStruct) -> WeatherData {
+    if let Some((idx, _factor)) = e.comfort_index() {
+        let style = if idx >= 10 {
+            Style::string(&[BlueBg, Black, Bold])
+        } else if idx >= 9 {
+            Style::string(&[GreenBg, Black, Bold])
+        } else if idx >= 8 {
+            Style::string(&[Green, Bold])
+        } else if idx >= 6 {
+            Style::string(&[Yellow, Bold])
+        } else if idx >= 4 {
+            Style::string(&[YellowBg, Black, Bold])
+        } else if idx >= 2 {
+            Style::string(&[Red, Bold])
+        } else {
+            Style::string(&[RedBg, Black, Bold])
+        };
+
+        WeatherData {
+            title: "Comfort".into(),
+            text: format!("{idx:.0}"),
+            style,
+        }
+    } else {
+        WeatherData::none()
+    }
+}
+
+fn format_comfort_worst(e: &WxEntryStruct) -> WeatherData {
+    if let Some((_, factor)) = e.comfort_index() {
+        let style = Style::string(&[]);
+        WeatherData {
+            title: "Worst Factor".into(),
+            text: format!("{factor}"),
+            style,
+        }
+    } else {
+        WeatherData::none()
+    }
+}
+
 const COLUMN_WIDTH: usize = 80;
 
 use crate::config::WxParams;
@@ -808,6 +849,8 @@ pub fn station_line(
             WxParams::Wind => data_vec.push(format_wind(e)),
             WxParams::Wind250mb => data_vec.push(format_250mb_wind(e)),
             WxParams::WxCode => data_vec.push(format_wx(e.wx_codes.clone())),
+            WxParams::ComfortIndex => data_vec.push(format_comfort(e)),
+            WxParams::WorstFactor => data_vec.push(format_comfort_worst(e)),
         }
     }
 

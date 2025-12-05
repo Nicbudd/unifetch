@@ -105,8 +105,6 @@ async fn get_open_meteo(s: &Station) -> Result<OpenMeteoResponse, String> {
 
     let t = r.text().await.map_err(|e| e.to_string())?;
 
-    // dbg!(&t);
-
     serde_json::from_str(&t).map_err(|e| e.to_string())
 }
 

@@ -284,6 +284,12 @@ pub enum WxParams {
 
     #[serde(alias = "raw_metar", alias = "METAR")]
     Metar,
+
+    #[serde(alias = "comfort", alias = "comfort_index")]
+    ComfortIndex,
+
+    #[serde(alias = "worst_factor", alias = "worst", alias = "worst_comfort")]
+    WorstFactor,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
