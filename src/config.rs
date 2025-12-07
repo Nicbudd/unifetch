@@ -345,7 +345,13 @@ pub struct ConfigTimezone {
 
 #[derive(Debug, Deserialize)]
 pub struct DateTimeConfig {
-    timezones: Vec<ConfigTimezone>,
+    #[serde(default = "t")]
+    pub timestamps: bool,
+    #[serde(default = "t")]
+    pub beat_time: bool,
+    #[serde(default = "t")]
+    pub mayan: bool,
+    pub timezones: Vec<ConfigTimezone>,
 }
 
 #[derive(Debug, Deserialize)]

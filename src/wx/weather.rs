@@ -3,28 +3,27 @@ use crate::config::Config;
 use crate::wx::*;
 
 use std::collections::BTreeMap;
-use std::fmt;
 use std::time::Duration;
 
 use chrono::{DateTime, Local, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json;
 
 use wxer_lib::*;
 
 // WEATHER ---------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Clone)]
-struct CloudLayer {
-    code: String,
-    height: u32,
-}
+// #[derive(Serialize, Deserialize, Clone)]
+// struct CloudLayer {
+//     code: String,
+//     height: u32,
+// }
 
-impl fmt::Debug for CloudLayer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}@{:5}", self.code, self.height)
-    }
-}
+// impl fmt::Debug for CloudLayer {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         write!(f, "{}@{:5}", self.code, self.height)
+//     }
+// }
 
 async fn wxer_query(loc: &str, time: &str, config: &Config) -> Result<String, String> {
     let addresses = &config.wxer.addresses;

@@ -7,12 +7,12 @@
 # modules are currently trusted, so security was not a concern while designing
 # the system.
 [localization]
-    # NO GUARANTEES ARE MADE ABOUT THE PRIVACY OF YOUR COORDINATES. USE AT OWN RISK
+# NO GUARANTEES ARE MADE ABOUT THE PRIVACY OF YOUR COORDINATES. USE AT OWN RISK
 # latitude = # in decimal
 # longitude = # in decimal
-    # Altitude (above mean sea level) follows same rules as coordinates.
+# Altitude (above mean sea level) follows same rules as coordinates.
 # altitude = # in meters
-    # Allow external services to see your coordinates.
+# Allow external services to see your coordinates.
 allowed_services = [] # ["usno", "wxer", "usgs"]
 
 # Addresses for wxer, required for current conditions module.
@@ -22,11 +22,34 @@ allowed_services = [] # ["usno", "wxer", "usgs"]
 addresses = ["http://localhost:6080"]
 
 [default_modules]
-standard = ["datetime", "weather", "earthquake", "random", "solarlunar", "forecast"]
-verbose = ["datetime", "weather", "earthquake", "random", "solarlunar", "tides", "forecast", 
-    "teleconnections"]
-extra_verbose = ["datetime", "weather", "earthquake", "random", "solarlunar", "tides", 
-    "teleconnections", "forecast"]
+standard = [
+    "datetime",
+    "weather",
+    "earthquake",
+    "random",
+    "solarlunar",
+    "forecast",
+]
+verbose = [
+    "datetime",
+    "weather",
+    "earthquake",
+    "random",
+    "solarlunar",
+    "tides",
+    "forecast",
+    "teleconnections",
+]
+extra_verbose = [
+    "datetime",
+    "weather",
+    "earthquake",
+    "random",
+    "solarlunar",
+    "tides",
+    "teleconnections",
+    "forecast",
+]
 # all available modules:
 # ["datetime", "earthquake", "forecast", "random", "solarlunar", "teleconnections", "tides", "weather"]
 
@@ -35,7 +58,12 @@ extra_verbose = ["datetime", "weather", "earthquake", "random", "solarlunar", "t
 
 [[datetime.timezones]]
 iana_name = "America/New_York"
-name = "EST"
+name = "Eastern"
+
+[[datetime.timezones]]
+iana_name = "America/Los_Angeles"
+name = "Pacific"
+
 
 [earthquakes]
 units = "mi"
@@ -57,44 +85,6 @@ radius = 500
 [teleconnections]
 values = ["enso", "nao"]
 # all possible values: ["enso", "nao"]
-
-
-# WEATHER SECTION
-
-# all available parameters:
-# ["apparent_temp", "cape", "clouds", "dewpoint","flight_rules", "height_500mb", 
-# "metar", "pressure", "rh", "temperature", "visibility", "wind", "wind_250mb",
-# "wx_code"]
-# The order the parameters are places are the order you will see them.
-# METAR is an exception. METAR will always appear at the end 
-[forecast.standard]
-parameters = ["flight_rules", "temp", "feels_like", "pres", "dew", "rh", "vis", 
-    "wind", "wxcode", "cloud"]
-hours = [0, 1, 2, 3, 6, 12, 18, 24, 48, 72, 96, 120]
-
-[forecast.verbose]
-parameters = ["flight_rules", "temp", "feels_like", "pres", "dew", "rh", "vis", 
-    "cape", "wind", "wxcode", "cloud", "250mb_wind", "500mb_height"]
-hours = [0, 1, 2, 3, 4, 6, 9, 12, 18, 24, 48, 72, 96, 120]
-
-[forecast.extra_verbose]
-parameters = ["flight_rules", "temp", "feels_like", "pres", "dew", "rh", "vis", 
-    "cape", "wind", "wxcode", "cloud", "250mb_wind", "500mb_height"]
-hours = [0, 1, 2, 3, 4, 5, 6, 9, 12, 18, 24, 30, 36, 42, 48, 56, 60, 66, 72, 84,
-    96, 108, 120, 132, 144]
-
-
-[weather.standard]
-parameters = ["flight_rules", "temp", "feels_like", "wxcode", "dew", "wind", 
-    "vis", "cloud", "pres", "metar"]
-
-[weather.verbose]
-parameters = ["flight_rules", "temp", "feels_like", "wxcode", "dew", "wind", 
-    "rh", "vis", "cloud", "pres", "250mb_wind", "500mb_height", "metar"]
-
-[weather.extra_verbose]
-parameters = ["flight_rules", "temp", "feels_like", "wxcode", "dew", "wind", 
-    "rh", "vis", "cloud", "pres", "250mb_wind", "500mb_height", "metar"]
 
 
 # tidal stations
@@ -126,3 +116,136 @@ parameters = ["flight_rules", "temp", "feels_like", "wxcode", "dew", "wind",
 # short_name = "ISLES SHLS"
 
 
+# WEATHER SECTION
+
+# all available parameters:
+# ["apparent_temp", "cape", "clouds", "dewpoint","flight_rules", "height_500mb", 
+# "metar", "pressure", "rh", "temperature", "visibility", "wind", "wind_250mb",
+# "wx_code"]
+# The order the parameters are places are the order you will see them.
+# METAR is an exception. METAR will always appear at the end 
+[forecast.standard]
+parameters = [
+    "flight_rules",
+    "temp",
+    "feels_like",
+    "pres",
+    "dew",
+    "rh",
+    "vis",
+    "wind",
+    "wxcode",
+    "cloud",
+]
+hours = [0, 1, 2, 3, 6, 12, 18, 24, 48, 72, 96, 120]
+
+[forecast.verbose]
+parameters = [
+    "flight_rules",
+    "temp",
+    "feels_like",
+    "pres",
+    "dew",
+    "rh",
+    "vis",
+    "cape",
+    "wind",
+    "wxcode",
+    "cloud",
+    "250mb_wind",
+    "500mb_height",
+]
+hours = [0, 1, 2, 3, 4, 6, 9, 12, 18, 24, 48, 72, 96, 120]
+
+[forecast.extra_verbose]
+parameters = [
+    "flight_rules",
+    "temp",
+    "feels_like",
+    "pres",
+    "dew",
+    "rh",
+    "vis",
+    "cape",
+    "wind",
+    "wxcode",
+    "cloud",
+    "250mb_wind",
+    "500mb_height",
+]
+hours = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    9,
+    12,
+    18,
+    24,
+    30,
+    36,
+    42,
+    48,
+    56,
+    60,
+    66,
+    72,
+    84,
+    96,
+    108,
+    120,
+    132,
+    144,
+]
+
+
+[weather.standard]
+parameters = [
+    "flight_rules",
+    "temp",
+    "feels_like",
+    "wxcode",
+    "dew",
+    "wind",
+    "vis",
+    "cloud",
+    "pres",
+    "metar",
+]
+
+[weather.verbose]
+parameters = [
+    "flight_rules",
+    "temp",
+    "feels_like",
+    "wxcode",
+    "dew",
+    "wind",
+    "rh",
+    "vis",
+    "cloud",
+    "pres",
+    "250mb_wind",
+    "500mb_height",
+    "metar",
+]
+
+[weather.extra_verbose]
+parameters = [
+    "flight_rules",
+    "temp",
+    "feels_like",
+    "wxcode",
+    "dew",
+    "wind",
+    "rh",
+    "vis",
+    "cloud",
+    "pres",
+    "250mb_wind",
+    "500mb_height",
+    "metar",
+]

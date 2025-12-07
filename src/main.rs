@@ -1,5 +1,6 @@
 mod common;
 mod config;
+mod datetime;
 mod earthquake;
 mod random;
 mod solarlunar;
@@ -94,7 +95,8 @@ async fn main() {
         || args.forecast
         || args.teleconnections
         || args.earthquakes
-        || args.tides);
+        || args.tides
+        || args.datetime);
 
     // open config file
     let config_opt = config::read_config_file(&args);
@@ -121,6 +123,10 @@ async fn main() {
         random::random_section();
     }
 
+    if config.enabled_modules.contains(&config::Modules::DateTime) {
+        datetime::datetime(&config);
+    }
+
     // async functions
     tokio::join!(
         updates::updates(&config),
@@ -131,9 +137,6 @@ async fn main() {
         // time_and_date();
 
         // obscure calendars/clocks
-
-        // Scrape GasBuddy
-        // gas_prices();
 
         // forecast_analysis();
         // climatology();
